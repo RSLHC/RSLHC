@@ -1,0 +1,590 @@
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE HAL
+OBJECT MODULE PLACED IN .\Output\hal.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\hal.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\List
+                    -ing\hal.lst) TABS(2) OBJECT(.\Output\hal.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __HAL_C__
+   3          #define __HAL_C__
+   4          
+   5          /**************************************************************************************************
+   6           *                                            INCLUDES
+   7           **************************************************************************************************/
+   8          #include  <INTRINS.H>
+   9          #include  "SC51F33XX.h"
+  10          #include  "main.h"
+  11          #include  "common.h"
+  12          #include  "flash.h"
+  13          #include  "hal.h"
+  14          #include  "function_key.h"
+  15          #include  "sysclk.h"
+  16          #include  "crt.h"
+  17          
+  18          /**************************************************************************************************
+  19           *                                        FUNCTIONS - API
+  20           **************************************************************************************************/
+  21          void SystemInit(void)
+  22          {
+  23   1        /* Test control Register*/
+  24   1        xTESTCON = 0x00;
+  25   1      
+  26   1        /* System configuration Register, Initial value : 81H */
+  27   1          xSYSCFG = 0           
+  28   1                | (1<<RSTCFG)  /* 0: P10 set as GPIO, 1: P10 set as external reset(default) */
+  29   1                | (1<<RCLCFG) /* 0: RCL keep on, 1: The RCL is on in working mode, and off in STOP/IDLE mode (de
+             -fault). */ 
+  30   1            | (1<<TREN);
+  31   1      
+  32   1      
+  33   1        /* System configuration2 Register, Initial value : 01H */
+  34   1        xSYSCFG2  = 0
+  35   1                  | (1<<DREN); /* 0: LPVR is off, 1: LPVR is on(default) */
+  36   1      
+  37   1        /* STOP mode configuration register */
+  38   1          xSTOPCFG |= (1<<PWRCFG); 
+  39   1                  /*  0: in stop mode, MVR is on, and LVR and LVD are controledl by LVREN and LVDEN.
+  40   1                    1: in stop mode, LVR and LVD are off. If DREN=1, then MVR and BGR are off, 
+  41   1                      core is supplied by LPVR. Awaking from STOP mode will enable BGR and MVR, 
+  42   1              and the power-supply will switch to MVR. 
+  43   1                    If the DREN=0, then MVR and BGR is on, detail please refer to Tab 12-1. */
+  44   1      
+  45   1        crt_init_IR();
+  46   1        clk_sel(CLK_SELRCH); // Use Internal Oscilator (16Mhz) // Sys Clock RCL : 20KHz / RCH : 16MHz
+  47   1        clk_div(DEVIDED_FREQ_1); // 16MHz / 1 = 16MHz
+  48   1      
+  49   1        SetDeltaV(); //LVD 설정
+  50   1      
+  51   1      
+  52   1      #if (USE_WATCH_DOG_TIMER == TRUE)
+                WDTCON = 0x07;  // Bit7~Bit3 : WDTRL[4:0]: 5-bit initial value for down counter with auto-load, the value
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 2   
+
+             - is 1FH by default.
+                        // Bit1~Bit0 : WDTPR[1:0]: WDT clock prescale selection bit.
+                        //         00: RCL/16.
+                        //         01: RCL/32.
+                        //         10: RCL/64.
+                        //         11: RCL/128 (default).
+                        //         RCL(=20KHz) / 128(WDTPR[1:0]=11) => 44ms(Overflow time step)
+              
+                SYSCFG  |= (1<<WDTCFG); //WDT is on in STOP mode.
+                SYSCFG  &= ~(1<<RCLCFG); // RCL is on.
+              
+              #else
+  65   1        //ClrWDT();
+  66   1        //WDTCLR0=0x53; 
+  67   1        //WDTCLR1=0xAC;
+  68   1      #endif
+  69   1      }
+  70          
+  71          void Keyscan_Interrupt_On(void)
+  72          {
+  73   1      /********************************************************************/
+  74   1      /* Key Matrix input Interrupt Init                                  */
+  75   1      /* P1.0 ~ P1.7 (8)                                                  */
+  76   1      /********************************************************************/
+  77   1        // xP1KBICON : KBI enable register
+  78   1        // 0 : Disable KBI
+  79   1        // 1 : Enable KBI
+  80   1        xP1KBICON |= KEY_INPUT_PINS_P1; /* Input port Keyscan function used */
+  81   1      
+  82   1        // xP1KBIWKP : interrupt polarity selection bit.
+  83   1        // 0: KBI interrupt is triggered by the falling edge, and KBI wake-up is low level active
+  84   1        // 1: KBI interrupt is triggered by the rising edge, and KBI wake-up is high level active.
+  85   1        xP1KBIWKP &= ~(KEY_INPUT_PINS_P1);
+  86   1      
+  87   1      /********************************************************************/
+  88   1      /* Key Matrix output Interrupt Init                                 */
+  89   1      /* P2.0 P2.1 P2.2 P2.5 P2.6 P0.6 P0.7 (7)                           */
+  90   1      /********************************************************************/
+  91   1        // xP0KBICON, xP2KBICON  : KBI enable register
+  92   1        // 0 : Disable KBI
+  93   1        // 1 : Enable KBI
+  94   1        xP2KBICON &= ~(KEY_OUTPUT_PINS_P2); /* Output port Keyscan function unused */
+  95   1        xP0KBICON &= ~(KEY_OUTPUT_PINS_P0);
+  96   1      
+  97   1        // xP0KBIWKP, xP2KBIWKP : interrupt polarity selection bit.
+  98   1        // 0: KBI interrupt is triggered by the falling edge, and KBI wake-up is low level active
+  99   1        // 1: KBI interrupt is triggered by the rising edge, and KBI wake-up is high level active.
+ 100   1        xP2KBIWKP |= KEY_OUTPUT_PINS_P2;
+ 101   1        xP0KBIWKP |= KEY_OUTPUT_PINS_P0;
+ 102   1      }
+ 103          
+ 104          void Keyscan_Interrupt_Off(void)
+ 105          {
+ 106   1      /********************************************************************/
+ 107   1      /* Key Matrix input Interrupt Init                                  */
+ 108   1      /* P1.0 ~ P1.7 (8)                                                  */
+ 109   1      /********************************************************************/
+ 110   1        // xP1KBICON : KBI enable register
+ 111   1        // 0 : Disable KBI
+ 112   1        // 1 : Enable KBI
+ 113   1        xP1KBICON &= ~(KEY_INPUT_PINS_P1); /* Input port Keyscan function unused */
+ 114   1      
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 3   
+
+ 115   1        // xP1KBIWKP : interrupt polarity selection bit.
+ 116   1        // 0: KBI interrupt is triggered by the falling edge, and KBI wake-up is low level active
+ 117   1        // 1: KBI interrupt is triggered by the rising edge, and KBI wake-up is high level active.
+ 118   1        xP1KBIWKP &= ~(KEY_INPUT_PINS_P1);
+ 119   1      
+ 120   1      /********************************************************************/
+ 121   1      /* Key Matrix output Interrupt Init                                 */
+ 122   1      /* P2.0 P2.1 P2.2 P2.5 P2.6 P0.6 P0.7 (7)                           */
+ 123   1      /********************************************************************/
+ 124   1        // xP0KBICON, xP2KBICON  : KBI enable register
+ 125   1        // 0 : Disable KBI
+ 126   1        // 1 : Enable KBI
+ 127   1        xP2KBICON &= ~(KEY_OUTPUT_PINS_P2); /* Output port Keyscan function unused */
+ 128   1        xP0KBICON &= ~(KEY_OUTPUT_PINS_P0);
+ 129   1      
+ 130   1        // xP0KBIWKP, xP2KBIWKP : interrupt polarity selection bit.
+ 131   1        // 0: KBI interrupt is triggered by the falling edge, and KBI wake-up is low level active
+ 132   1        // 1: KBI interrupt is triggered by the rising edge, and KBI wake-up is high level active.
+ 133   1        xP2KBIWKP &= ~(KEY_OUTPUT_PINS_P2);
+ 134   1        xP0KBIWKP &= ~(KEY_OUTPUT_PINS_P0);
+ 135   1      }
+ 136          
+ 137          
+ 138          /**
+ 139            * @brief  crt initialize and set for IR test
+ 140            * @retval None
+ 141            */
+ 142          void crt_init_IR(void)
+ 143          {
+ 144   1        CRT_onoff(CRT_ON);  // CRT ON/OFF
+ 145   1        CRT_modesel(CRT_MODULATE);  // Modulation, Demodulation 선택
+ 146   1        CRT_insel(CRT_INP30); // CRT out port 설정 (P3.0)
+ 147   1          CRT_clkdiv(1);  // 16MHz / n+1 = 16MHz / 1+1 = 8MHz
+ 148   1        CRT_REM2P30();
+ 149   1        CRT_remops(CRT_REMOPS0);
+ 150   1      }
+ 151          
+ 152          // Watchdog Register Clear
+ 153          // 한 번 CLear 하면 이 후에도 계속 자동으로 Counter 값이 셋팅된다.
+ 154          // 한 번 Clear 하면 Watchdog을 멈출 수 없다.
+ 155          void ClrWDT()
+ 156          {
+ 157   1        WDTCLR0=0x00;  
+ 158   1        WDTCLR1=0x00;  
+ 159   1        WDTCLR0=0x53; 
+ 160   1        WDTCLR1=0xAC;
+ 161   1      }
+ 162          
+ 163          /**
+ 164            * @brief  according to VDD voltage setting CP0VRCON 
+ 165            * @note   Update Register: CP0VRCON,SPMC0,VMC0
+ 166            */
+ 167          void SetDeltaV(void)
+ 168          {
+ 169   1      //    int8u i,m;
+ 170   1          //LVRCON |= 0x80;  /*turn on reference voltage,it han been opened before call this function in fact*/
+ 171   1        LVDCON  = 0     /*open low tension detection 2.2V*/
+ 172   1            | (1<<LVDEN)  // LVD is on
+ 173   1            | (0<<LVLS3)  // LVLS[3:0] : LVD detecting voltage selection bit
+ 174   1            | (1<<LVLS2)  // VLVD = 1.8V + LVLS[3:0]
+ 175   1            | (0<<LVLS1)  // LVLS3(0), LVLS2(1), LVLS1(0), LVLS0(0) = 4
+ 176   1            | (0<<LVLS0); // VLVD = 1.8V + 0.4V = 2.2V 
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 4   
+
+ 177   1      
+ 178   1      
+ 179   1        LVRCON = _1000_0000B; // LVR is on, LVR reset voltage is 1.6V
+ 180   1      
+ 181   1          t0_wait(1);         /*stabilize dozens of us*/ 
+ 182   1      
+ 183   1        // CP0VRCON : ACMP internal reference voltage control register
+ 184   1        //CP0VRCON = 0xf1; /*>=2.9v*/
+ 185   1        CP0VRCON = 0x89; /*>=3.3v*/
+ 186   1      
+ 187   1      }
+ 188          
+ 189          
+ 190          void ExtInt_init(void)
+ 191          {
+ 192   1        EA = 0;
+ 193   1        IE = 0x00;    /* Disable Interrupt(T2, UART0, T1, INT1, T0, INT0) */
+ 194   1        EIE1 = 0x00;  /* Disable Interrupt(COMPARATOR_0_FE, COMPARATOR_0_RE, LVD, I2C, SPI) */
+ 195   1        EIE2 = 0x00;  /* Disable Interrupt(T168, KBI, INT3, INT2, CRT) */
+ 196   1      
+ 197   1        EIE2 |= (1<<EKBI); /* Enable KBI Interrupt */
+ 198   1      }
+ 199          
+ 200          void InitPort(void)
+ 201          {
+ 202   1      /*  When Px.n set as output, if register Px[n]=0, the Px.n output logic low; 
+ 203   1          else if Px[n]=1，then the Px.n output logic high(push-pull output) or Hi-Z(open-drain output).  
+ 204   1          Reading register Px[n] is not affected by the P0.n port status.
+ 205   1          When Px.n set as input, writing register Px[n] doesn’t affect Px.n port status. 
+ 206   1          When Reading register Px[n], value 0 means Px.n input logic low, and value 1 means Px.n input logic hi
+             -gh.*/
+ 207   1      
+ 208   1      /*  {OE,MD} Port mode control bit: {PxOE[n],PxMD[n]} control port Px.n
+ 209   1          00: floating input;
+ 210   1          01: pull-up input;
+ 211   1          10: push-pull output;
+ 212   1          11: open-drain output. */
+ 213   1      
+ 214   1      /********************************************************************/
+ 215   1      /* Key Matrix input pull-up init                                    */
+ 216   1      /* P1.0 ~ P1.7 (8)                                                  */
+ 217   1      /********************************************************************/
+ 218   1        /* Data register */
+ 219   1        P1 = _0000_0000B;
+ 220   1        
+ 221   1        /* P1 mode control register */
+ 222   1        P1MDH = _0101_0101B; // P1OE7 P1MD7 | P1OE6 P1MD6 | P1OE5 P1MD5 | P1OE4 P1MD4 // 0x55
+ 223   1        P1MDL = _0101_0101B; // P1OE3 P1MD3 | P1OE2 P1MD2 | P1OE1 P1MD1 | P1OE0 P1MD0 // 0x55
+ 224   1      
+ 225   1      
+ 226   1      /********************************************************************/
+ 227   1      /* Key Matrix output push-pull init                                 */
+ 228   1      /* P2.0 P2.1 P2.2 P2.5 P2.6 P0.6 P0.7 (7)                           */
+ 229   1      /********************************************************************/
+ 230   1          /* Data register */
+ 231   1        P2 = 0 | _0110_0111B;
+ 232   1        P0 = 0 | _1100_0000B;
+ 233   1      
+ 234   1        /* P2 mode control register */
+ 235   1        P2MDH = _0110_1001B; // P2OE7 P2MD7 | P2OE6 P2MD6 | P2OE5 P2MD5 | P2OE4 P2MD4 // 0x69
+ 236   1        P2MDL = _0110_1010B; // P2OE3 P2MD3 | P2OE2 P2MD2 | P2OE1 P2MD1 | P2OE0 P2MD0 // 0x6A
+ 237   1        /* P0 mode control register (high byte)*/
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 5   
+
+ 238   1        P0MDH = _1010_0101B; // P0OE7 P0MD7 | P0OE6 P0MD6 | P0OE5 P0MD5 | P0OE4 P0MD4 // 0xA5
+ 239   1      
+ 240   1      /********************************************************************/
+ 241   1      /* Led output init                                                  */
+ 242   1      /* P0.0                                                             */  
+ 243   1      /********************************************************************/
+ 244   1        /* Data register */ 
+ 245   1        P0 |= _0000_0001B;
+ 246   1      
+ 247   1        /* P0 mode control register (low byte)*/
+ 248   1          P0MDL = _0101_0110B; // P0OE3 P0MD3 | P0OE2 P0MD2 | P0OE1 P0MD1 | P0OE0 P0MD0 // 0x56
+ 249   1      
+ 250   1      
+ 251   1      /********************************************************************/
+ 252   1      /* IR port init                                                     */
+ 253   1      /* REM : P3.0                                                       */
+ 254   1      /********************************************************************/
+ 255   1        /* Data register */
+ 256   1        P3 = _1111_1110B; 
+ 257   1      
+ 258   1        /* P3 mode control register (low byte) */     
+ 259   1        P3MDL = _1010_1010B; // P3OE7 P3MD7 | P3OE6 P3MD6 | P3OE5 P3MD5 | P3OE4 P3MD4 // 0xAA
+ 260   1      
+ 261   1      
+ 262   1      /* P10 mode control register (low byte) */ 
+ 263   1        xP10MDL = _1010_1001B; // - - - - - - P10OE0 P10MD0 // 0xA9
+ 264   1      
+ 265   1        _nop_();
+ 266   1      
+ 267   1      }
+ 268          
+ 269          void stop_define(void)
+ 270          {
+ 271   1        ir_ok            = FALSE;
+ 272   1        setting_ok       = FALSE;
+ 273   1        t1_int           = 2;
+ 274   1        backup_key       = NO_KEY;
+ 275   1        led_force        = 0xff;
+ 276   1        //backlight_info   = DIM_OFF;
+ 277   1        //backlight_cnt    = 0;
+ 278   1      #if (USE_SPECIAL_0FEH_5 == TRUE)
+ 279   1        Three_low_keyoff = 0;
+ 280   1      #endif
+ 281   1        ContinueDoubleKey=0;
+ 282   1        twokey_result=0xff;
+ 283   1        IrKeyBuf=0xff;
+ 284   1        backup_IrKeyBuf=0xff;
+ 285   1      #if (USE_AVSHIFT_MODE == TRUE)
+ 286   1        avShiftMode_active=0;
+ 287   1      #endif
+ 288   1      
+ 289   1      #if (USE_STUCKKEY_TIMER == TRUE)
+ 290   1        StuckKeyTimer_Stop;
+ 291   1      #endif
+ 292   1      
+ 293   1        //Outputs "L" level to GPIO.
+ 294   1        P2 &= ~(_0110_0111B);
+ 295   1        P0 &= ~(_1100_0000B);
+ 296   1      
+ 297   1        //Learn_Pwr_Off;
+ 298   1        //device_led_off(IR_SENDING_LED);
+ 299   1        all_led_off;
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 6   
+
+ 300   1      
+ 301   1        CRT_onoff(CRT_OFF);
+ 302   1        P3 &= ~0x01;
+ 303   1        
+ 304   1        Timer0_stop;
+ 305   1        Timer1_stop;
+ 306   1        Timer2_stop;
+ 307   1      
+ 308   1      }
+ 309          
+ 310          #if 1
+ 311          void ram_check(void)
+ 312          {
+ 313   1        int8u   retry=3;
+ 314   1        int8u   ram_broken=0;
+ 315   1      
+ 316   1        //printf("ram_check\n");
+ 317   1      
+ 318   1        chksum_cal();
+ 319   1      
+ 320   1        if((chksum!=set_no.set_member.Chksum.sum) || ((int8u)(~chksum)!=set_no.set_member.Chksum.com))    //ram ng.
+             - -> default.
+ 321   1        {
+ 322   2          while(retry)
+ 323   2          {
+ 324   3            Information_RW(READ);
+ 325   3            chksum_cal();
+ 326   3      
+ 327   3            if((chksum==set_no.set_member.Chksum.sum) && ((int8u)(~chksum)==set_no.set_member.Chksum.com))
+ 328   3              break;
+ 329   3            retry--;
+ 330   3          }
+ 331   2          if(!retry)
+ 332   2          {
+ 333   3            FactoryDefault();
+ 334   3          }
+ 335   2        }
+ 336   1      
+ 337   1      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 338   1        if((set_no.set_member.set_no.stb_src < IR_CUSTOM_NUM_MIN) || (set_no.set_member.set_no.stb_src > IR_CUSTO
+             -M_NUM_MAX)
+ 339   1      #else
+                if((set_no.set_member.set_no.stb_src!=DEFAULT_STB_SET_NO)
+              #endif
+ 342   1        )
+ 343   1          ram_broken=1;
+ 344   1        if(set_no.set_member.set_dev.stb_src!=DEV_STB)
+ 345   1          ram_broken=1;
+ 346   1      
+ 347   1        if(ram_broken)
+ 348   1        {
+ 349   2          FactoryDefault();
+ 350   2          WDG_SystemReset();
+ 351   2        }
+ 352   1      
+ 353   1      }
+ 354          #endif
+ 355          
+ 356          
+ 357          void reset_define(void)
+ 358          {
+ 359   1        int8u retry=3;
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 7   
+
+ 360   1        int8u ram_broken=0;
+ 361   1      
+ 362   1        ir_ok=FALSE;
+ 363   1        setting_ok=FALSE;
+ 364   1        t1_int=2;
+ 365   1        backup_key=0xff;
+ 366   1        curr_state=NORMAL_MODE;
+ 367   1        Timer0_65ms16=0;
+ 368   1        Timer0_65ms16_2=0;
+ 369   1        Timer1_1sec08 = 0;
+ 370   1        FactoryEntryCnt = 0;
+ 371   1        crt_int_counter = 0;
+ 372   1        RC5_Toggle=0;
+ 373   1        power_toggle=0;
+ 374   1        led_force=0xff;
+ 375   1      #if (USE_SPECIAL_0FEH_5 == TRUE)
+ 376   1        Three_low_keyoff=0;
+ 377   1      #endif
+ 378   1        bTestModeEnable = 0;
+ 379   1        ContinueDoubleKey=0;
+ 380   1        IrKeyBuf=0xff;
+ 381   1        backup_IrKeyBuf=0xff;
+ 382   1      #if (USE_AVSHIFT_MODE == TRUE)
+ 383   1        avShiftMode_active=0;
+ 384   1      #endif
+ 385   1      #if (USE_BACKLIGHT == TRUE)
+              //  backlight_info=DIM_OFF;
+              //  backlight_cnt=0;
+                BackLight_Dim_Off();
+              #endif
+ 390   1        key_buf_old_clear();
+ 391   1      
+ 392   1        STB_IRoutCommon();
+ 393   1        backup_source=curr_source;
+ 394   1      
+ 395   1      #if (USE_BATT_MONITOR == TRUE)
+ 396   1        keyCnt_inLow=LVI_CHECK_CNT;
+ 397   1      #endif
+ 398   1      
+ 399   1        ram_check();
+ 400   1      
+ 401   1        wBitStream_Clear();
+ 402   1      
+ 403   1        while(getkey_simple()){}  
+ 404   1        device_Led_blink(IR_SENDING_LED, 1, 2, 0);
+ 405   1        device_led_off(IR_SENDING_LED);
+ 406   1      }
+ 407          
+ 408          void  FactoryDefault(void)
+ 409          {
+ 410   1      #if (USE_IR_LEARN == TRUE)
+                EraseLearnDataToAll();
+              #endif
+ 413   1      
+ 414   1        curr_source=SRC_STB;
+ 415   1        backup_source=curr_source;
+ 416   1      
+ 417   1        set_no.set_member.set_no.stb_src=DEFAULT_STB_SET_NO;
+ 418   1      #if (USE_BATCH_SS_LG == TRUE)
+ 419   1        set_no.set_member.set_no.tv_src=DEFAULT_UR_VIRTUAL_NO;
+ 420   1      #else
+                set_no.set_member.set_no.tv_src=STANDARD_SAMSUNG_TV;
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 8   
+
+              #endif
+ 423   1      
+ 424   1        set_no.set_member.set_dev.stb_src=DEV_STB;
+ 425   1        set_no.set_member.set_dev.tv_src=DEV_TV;
+ 426   1      
+ 427   1        Save_Information_All();
+ 428   1      }
+ 429          
+ 430          void Timer0_65msStart(void)
+ 431          {
+ 432   1        TMOD |=  0 
+ 433   1           |  (0<<T0M1) // T0M[1:0] = 01(mode 0)
+ 434   1           |  (1<<T0M0);  // 00: mode 0, 13-bit counting mode (default).
+ 435   1                  // 01: mode 1, 16-bit counting mode.
+ 436   1                  // 10: mode 2, 8-bit counting mode with auto-reload.
+ 437   1                  // 11: mode 3, 2 independent 8-bit counters.
+ 438   1      
+ 439   1        xTIMPRS |= 0         // fCLK/2 fCLK/4 fCLK/8 fCLK/16 fCLK/32 fCLK/64 fCLK/128 fCLK/256  
+ 440   1            | (0<<TIMPRS02)  //    0      0      0      0       1       1       1        1   
+ 441   1            | (1<<TIMPRS01)  //    0      0      1      1       0       0       1        1
+ 442   1            | (1<<TIMPRS00); //    0      1      0      1       0       1       0        1
+ 443   1        // 16MHz /  65536 /  16    = 15Hz = 65ms
+ 444   1        // fCLK / TMOD / TIMPR
+ 445   1      
+ 446   1        TF0 = 0; // 0: no T0 overflow interrup_t request generated.
+ 447   1      
+ 448   1        Timer0_start; // enable Timer0 interrup_t request, T0 is on.
+ 449   1        Interrupt_Enable;
+ 450   1      }
+ 451          
+ 452          void Timer1_1secStart(void)
+ 453          {
+ 454   1        
+ 455   1        TMOD |=  0 
+ 456   1           |  (0<<T1M1) // T1M[1:0] = 01(mode 2)
+ 457   1           |  (1<<T1M0);  // 00: mode 0, 13-bit counting mode (default).
+ 458   1                  // 01: mode 1, 16-bit counting mode.
+ 459   1                  // 10: mode 2, 8-bit counting mode with auto-reload.
+ 460   1                  // 11: mode 3, 2 independent 8-bit counters.
+ 461   1      
+ 462   1        xTIMPRS |= 0         // fCLK/2 fCLK/4 fCLK/8 fCLK/16 fCLK/32 fCLK/64 fCLK/128 fCLK/256  
+ 463   1            | (1<<TIMPRS12)  //    0      0      0      0       1       1       1        1   
+ 464   1            | (1<<TIMPRS11)  //    0      0      1      1       0       0       1        1
+ 465   1            | (1<<TIMPRS10); //    0      1      0      1       0       1       0        1
+ 466   1        // 16MHz / 256 / 256    = 0.953Hz = 1sec
+ 467   1        // fCLK / TMOD / TIMPR
+ 468   1      
+ 469   1        Timer1_start; // enable Timer1 interrup_t request, T1 is on.
+ 470   1        Interrupt_Enable;
+ 471   1      }
+ 472          
+ 473          void Timer2_Start(void) //Envelop Timer
+ 474          {
+ 475   1        //T2CON1
+ 476   1        T2CNT = 0; // timer mode, in which T2 is clocked by prescale of FCLK.
+ 477   1        T2CPNRL = 0; //reload mode, triggered by effective edge of T2EX or T2 overflowing.
+ 478   1      
+ 479   1      //  xT2CON2 = 0         // fCLK/2 fCLK/4 fCLK/8 fCLK/16 fCLK/32 fCLK/64 fCLK/128 fCLK/256  
+ 480   1      //      |= (1<<T2CK2)   //    0      0      0      0       1       1       1        1   
+ 481   1      //      |= (0<<T2CK1)   //    0      0      1      1       0       0       1        1
+ 482   1      //      |= (0<<T2CK0);    //    0      1      0      1       0       1       0        1
+ 483   1        xT2CON2 = 0x04 ;
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 9   
+
+ 484   1        // 16MHz / 32     = 0.5MHz = 2us --------> 한 카운터 당 2us
+ 485   1        // 풀 카운트(65536) 시 130ms
+ 486   1        // fCLK / T2CK[2:0]
+ 487   1      
+ 488   1      
+ 489   1        if(curr_device == DEV_STB)
+ 490   1        {
+ 491   2          RCAP2L = 0xF0;  //Read high pulse timing 오류 현상 보완
+ 492   2          RCAP2H = 0xFF;
+ 493   2        }
+ 494   1        else
+ 495   1        {
+ 496   2          RCAP2L = 0xFF;  //Read high pulse timing 오류 현상 보완
+ 497   2          RCAP2H = 0xFF;
+ 498   2        }
+ 499   1        
+ 500   1      
+ 501   1        IP |= (1<<5);
+ 502   1      
+ 503   1        Timer2_start; // enable Timer2 interrup_t request, T2 is on.
+ 504   1        Interrupt_Enable;
+ 505   1      }
+ 506          
+ 507          
+ 508          void TickTimer_65msStart(int16u time)
+ 509          {
+ 510   1        Timer0_65ms16 = time;
+ 511   1      
+ 512   1        //Timer0_50msStart();
+ 513   1        Timer0_65msStart();
+ 514   1      }
+ 515          
+ 516          #if 0 //t1 = 500us
+              void BatchTimer_500usStart(int16u time)
+              {
+                Timer1_500us16=time;
+              
+                Timer1_500usStart();
+              }
+              #endif
+ 524          
+ 525          
+ 526          #if (USE_STUCKKEY_TIMER == TRUE)
+ 527          void StuckKeyTimer_Start(int8u time)
+ 528          {
+ 529   1        Timer1_1sec08 = time;
+ 530   1      
+ 531   1        Timer1_1secStart();
+ 532   1      }
+ 533          #endif
+ 534          
+ 535          #if 0
+              void WDT_clear()
+              {
+                WDTMR = 0x20;   // Clear Watch-dog timer
+              }
+              #endif
+ 541          
+ 542          #endif  //__HAL_C__
+ 543          
+
+
+C51 COMPILER V9.60.0.0   HAL                                                               12/02/2021 14:01:36 PAGE 10  
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    715    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

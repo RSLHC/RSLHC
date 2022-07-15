@@ -1,0 +1,1857 @@
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE FUNCTION_KEY
+OBJECT MODULE PLACED IN .\Output\function_key.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\function_key.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRI
+                    -NT(.\Listing\function_key.lst) TABS(2) OBJECT(.\Output\function_key.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __FUNCTION_KEY_C__
+   3          #define __FUNCTION_KEY_C__
+   4          /**************************************************************************************************
+   5           *                                            INCLUDES
+   6           **************************************************************************************************/
+   7          #include    <INTRINS.H>
+   8          #include    "SC51F33XX.h"
+   9          #include  "type_def.h"
+  10          #include  "define.h"
+  11          #include  "rom.h"
+  12          #include  "ram.h"
+  13          #include    "main.h"
+  14          #include  "common.h"
+  15          #include  "function_key.h"
+  16          #include  "hal.h"
+  17          #include  "flash.h"
+  18          #if (USE_IR_LEARN == TRUE)
+              #include  "learn.h"
+              #endif
+  21          
+  22          /**************************************************************************************************
+  23           *                                        FUNCTIONS - API
+  24           **************************************************************************************************/
+  25          void STB_IRoutCommon(void)
+  26          {
+  27   1        curr_source=SRC_STB;
+  28   1        //curr_device=DEV_STB;
+  29   1        //setting_no=1;
+  30   1        curr_device=set_no.set_member.set_dev.stb_src;
+  31   1        setting_no=set_no.set_member.set_no.stb_src;
+  32   1      }
+  33          
+  34          void STB_SettingCommon(void)
+  35          {
+  36   1        setting_source=SRC_STB;
+  37   1        curr_source=setting_source;
+  38   1        //backup_source=curr_source;
+  39   1      }
+  40          
+  41          #if (USE_TEST_MODE == TRUE)
+  42          void TestMode_IRoutCommon(void)
+  43          {
+  44   1        curr_source=SRC_STB;
+  45   1        curr_device=DEV_TESTMODE;
+  46   1        setting_no=1;
+  47   1      }
+  48          #endif
+  49          
+  50          void UR_SettingCommon(int8u set_source)
+  51          {
+  52   1        setting_source=set_source;
+  53   1        curr_source=setting_source;
+  54   1        //backup_source=curr_source;
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 2   
+
+  55   1      } 
+  56          
+  57          #if (USE_LOW_BATT_IROUT == TRUE)
+  58          void Low_Voltage_CodeOut(void)
+  59          {
+  60   1        STB_IRoutCommon();
+  61   1        IrKeyBuf=KEY_LOWBATT;
+  62   1        backup_IrKeyBuf=0xff;
+  63   1        irout_n(1);
+  64   1        pulse_stop();
+  65   1      }
+  66          #endif
+  67          
+  68          void PulseOut_nFrame(int8u i)
+  69          {
+  70   1        outframeNo=i;
+  71   1        backup_key=0xff;
+  72   1      
+  73   1        my_sub();
+  74   1      
+  75   1        if(ir_ok)
+  76   1          while(keyholdcnt<outframeNo){}
+  77   1      
+  78   1        pulse_stop();
+  79   1        device_led_off(IR_SENDING_LED);
+  80   1      }
+  81          
+  82          void PulseOut_Above_nFrame(int8u i)
+  83          {
+  84   1        backup_key=0xff;
+  85   1      
+  86   1        my_sub();
+  87   1      
+  88   1        if(ir_ok)
+  89   1        {
+  90   2          while(keyholdcnt<i-1){}
+  91   2          backup_key=key_buf[0];
+  92   2          while(1)
+  93   2          {
+  94   3            getkey(&key_buf[0]);
+  95   3            if(key_cnt==1)
+  96   3            {
+  97   4              if(backup_key!=key_buf[0])
+  98   4                break;
+  99   4              else
+ 100   4                continue;
+ 101   4            }
+ 102   3            else
+ 103   3              break;
+ 104   3          }
+ 105   2          if(ir_ok)
+ 106   2          {
+ 107   3            t1_int=1;
+ 108   3            while(t1_int!=2){}
+ 109   3          }
+ 110   2      
+ 111   2          pulse_stop();
+ 112   2          device_led_off(IR_SENDING_LED);
+ 113   2        }
+ 114   1        else
+ 115   1        {
+ 116   2          pulse_stop();
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 3   
+
+ 117   2          device_led_off(IR_SENDING_LED);
+ 118   2        }
+ 119   1      }
+ 120          
+ 121          #if (USE_BATCH_SS_LG == TRUE)
+ 122          BOOL batch_SS_LG_Common(int8u device, set_number_t set_no, int8u key)
+ 123          {
+ 124   1        if((device == DEFAULT_UR_DEVICE)&&(set_no == DEFAULT_UR_SET_NO))
+ 125   1        {
+ 126   2          curr_source=SRC_TV;
+ 127   2          curr_device=DEV_TV;
+ 128   2          setting_no=STANDARD_LG_TV;
+ 129   2          batch_mode_setting_no=setting_no;
+ 130   2          batch_mode_keybuf = key;
+ 131   2          IrKeyBuf = key;
+ 132   2          PulseOut_nFrame(1);
+ 133   2      #if (USE_AVSHIFT_MODE == TRUE)
+ 134   2          if(!avShiftMode_active)
+ 135   2      #endif
+ 136   2          device_led_on(IR_SENDING_LED);
+ 137   2      
+ 138   2        //  t0_wait(1);
+ 139   2          Delayby10us(3860);
+ 140   2      
+ 141   2          curr_source=SRC_TV;
+ 142   2          curr_device=DEV_TV;
+ 143   2          setting_no=STANDARD_SAMSUNG_TV;
+ 144   2          batch_mode_setting_no=setting_no;
+ 145   2          batch_mode_keybuf = key;
+ 146   2          IrKeyBuf = key;
+ 147   2          PulseOut_nFrame(1);
+ 148   2      
+ 149   2          setting_no=DEFAULT_UR_VIRTUAL_NO;
+ 150   2          batch_mode_setting_no=0;
+ 151   2          return TRUE;
+ 152   2        }
+ 153   1        return FALSE;
+ 154   1      }
+ 155          #endif
+ 156          
+ 157          //--------------------------------------------------------------
+ 158          BOOL SetModeIn_TimeCheck(int16u time)
+ 159          {
+ 160   1        TickTimer_65msStart(time);
+ 161   1      
+ 162   1        while(Timer0_65ms16)
+ 163   1        {
+ 164   2          getkey(&key_buf[0]);
+ 165   2      
+ 166   2          
+ 167   2          if(!Timer0_65ms16)
+ 168   2          {
+ 169   3            //Setting_Mode();
+ 170   3            return  TRUE;
+ 171   3          }
+ 172   2          if(key_cnt==2)
+ 173   2            continue;
+ 174   2          else
+ 175   2          {
+ 176   3            backup_key=0xff;
+ 177   3            break;
+ 178   3          }
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 4   
+
+ 179   2        }//end of while (2key in)
+ 180   1        return  FALSE;
+ 181   1      }
+ 182          
+ 183          #if (USE_QUICKLY_KEY == TRUE)
+              void QuicklyKey_Delay(void)
+              {
+                int16u bi;
+              
+                for(bi=0;bi<5000;bi++) wait_10us();
+              }
+              #endif
+ 191          
+ 192          
+ 193          #if (USE_TEST_MODE == TRUE)
+ 194          void NecDataQuicklyLoad_FillPattern(int8u codedata)
+ 195          {
+ 196   1        int8u i, idxKey;
+ 197   1        const int8u       LOGIC0=21;
+ 198   1        const int8u       LOGIC1=63;
+ 199   1        const int8u       LOGIC0_LOW=21;
+ 200   1      
+ 201   1        idxKey=codedata;
+ 202   1      
+ 203   1        for(i=34; i<50; i++)                        //data
+ 204   1        {
+ 205   2          if(idxKey&0x01)                           //logic 1
+ 206   2          {
+ 207   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i++]=(0x8000+(LOGIC0));  //high
+ 208   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i]=(LOGIC1);           //low
+ 209   3          }
+ 210   2          else                                      //logic 0
+ 211   2          {
+ 212   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i++]=(0x8000+(LOGIC0));  //high
+ 213   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i]=(LOGIC0_LOW);           //low
+ 214   3          }
+ 215   2          idxKey>>=1;
+ 216   2        }
+ 217   1      
+ 218   1        codedata>>=4;
+ 219   1        for(i=58; i<66; i++)                        //data bar high nibble.
+ 220   1        {
+ 221   2          if(codedata&0x01)                             //logic 0
+ 222   2          {
+ 223   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i++]=(0x8000+(LOGIC0));  //high
+ 224   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i]=(LOGIC0_LOW);           //low
+ 225   3          }
+ 226   2          else                                      //logic 1
+ 227   2          {
+ 228   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i++]=(0x8000+(LOGIC0));  //high
+ 229   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i]=(LOGIC1);           //low
+ 230   3          }
+ 231   2          codedata>>=1;
+ 232   2        }
+ 233   1      }
+ 234          
+ 235          void Factory_Version_Reporting(void)
+ 236          {
+ 237   1        my_newkeyincond();
+ 238   1        wBitStream_Clear();
+ 239   1      
+ 240   1        TestMode_IRoutCommon();
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 5   
+
+ 241   1        IrKeyBuf=KEY_STBPOWER;
+ 242   1        Send_UR_Ready();
+ 243   1      
+ 244   1        ir_ok=TRUE;
+ 245   1        NecDataQuicklyLoad_FillPattern(SW_VERSION[0]);
+ 246   1          //device_led_on(IR_SENDING_LED);
+ 247   1        backup_IrKeyBuf=0xff;
+ 248   1        outframeNo = 3;
+ 249   1        send_ur();
+ 250   1      
+ 251   1        if(ir_ok)
+ 252   1          while(keyholdcnt<outframeNo){}
+ 253   1      
+ 254   1        pulse_stop();
+ 255   1      }
+ 256          
+ 257          void rsApp_EnterTestModeFunction(void)
+ 258          {
+ 259   1        Factory_Version_Reporting();
+ 260   1        backup_key=0xff;
+ 261   1      
+ 262   1        device_Led_blink(IR_SENDING_LED, 3, 2, 2);
+ 263   1      }
+ 264          
+ 265          void rsApp_ExitTestModeFunction(void)
+ 266          {
+ 267   1        if(ir_ok)
+ 268   1        {
+ 269   2          t1_int=1;
+ 270   2          while(t1_int!=2){}
+ 271   2        }
+ 272   1        pulse_stop();
+ 273   1        device_led_off(IR_SENDING_LED);
+ 274   1        FactoryDefault();
+ 275   1      
+ 276   1        ReturnNormal();
+ 277   1      
+ 278   1        TestMode_IRoutCommon();
+ 279   1        IrKeyBuf = FACTORY_TEST_KEY[4];
+ 280   1        backup_IrKeyBuf=0xff;
+ 281   1        irout_n(1);
+ 282   1        pulse_stop();
+ 283   1        bTestModeEnable=0;
+ 284   1        FactoryEntryCnt=0;
+ 285   1        STB_IRoutCommon();
+ 286   1        key_buf[0] = KEY_NULL;
+ 287   1      
+ 288   1        t0_wait(10);
+ 289   1        SW_SystemReset();
+ 290   1      }
+ 291          
+ 292          void Factory_Test_Process(void)
+ 293          {
+ 294   1        static int8u code*  pKey=FACTORY_TEST_KEY;
+ 295   1      
+ 296   1        if(bTestModeEnable)
+ 297   1        {
+ 298   2          TestMode_IRoutCommon();
+ 299   2      
+ 300   2          backup_key=0xff;
+ 301   2      
+ 302   2          IrKeyBuf = key_buf[0];
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 6   
+
+ 303   2          //backup_IrKeyBuf=0xff;
+ 304   2      
+ 305   2          irout_n(0xff);
+ 306   2      
+ 307   2          //backup_key=key_buf[0];
+ 308   2          backup_key=0xff;
+ 309   2      
+ 310   2          if(*(pKey+4)==key_buf[0]) 
+ 311   2          {
+ 312   3            rsApp_ExitTestModeFunction();
+ 313   3          }
+ 314   2          return;
+ 315   2        }
+ 316   1      
+ 317   1        if(FactoryEntryCnt>4)
+ 318   1          return;
+ 319   1        
+ 320   1        if(*(pKey+FactoryEntryCnt)==key_buf[0])
+ 321   1          FactoryEntryCnt++;
+ 322   1        else if(*(pKey+FactoryEntryCnt-1)==key_buf[0]){}
+ 323   1        else
+ 324   1          FactoryEntryCnt=0xff;
+ 325   1      
+ 326   1        if(FactoryEntryCnt==4)
+ 327   1        {
+ 328   2          rsApp_EnterTestModeFunction();
+ 329   2          bTestModeEnable = 1;
+ 330   2        }
+ 331   1      
+ 332   1      }
+ 333          #endif
+ 334          
+ 335          
+ 336          void functionKeyProcess(void)
+ 337          {
+ 338   1        if(curr_state == NORMAL_MODE)
+ 339   1        {
+ 340   2          curr_source = SRC_STB;
+ 341   2          backup_source = SRC_STB;
+ 342   2      
+ 343   2      #if (USE_AVSHIFT_MODE == TRUE)
+ 344   2          if(!isAvShiftKeyIn)
+ 345   2            avShiftMode_active = 0;
+ 346   2      #endif
+ 347   2        }
+ 348   1      #if (USE_AVSHIFT_MODE == TRUE)
+ 349   1        else
+ 350   1        {
+ 351   2          avShiftMode_active = 0;
+ 352   2        }
+ 353   1      #endif
+ 354   1      
+ 355   1        curr_device=*(set_no.set_reg+curr_source+(SRC_CNT*INC_PTR_SIZE));
+ 356   1      
+ 357   1        (*pfunc_ptr[key_buf[0]]) ();
+ 358   1      }
+ 359          
+ 360          //----------------------------------------;
+ 361          // remote program start.
+ 362          //----------------------------------------;
+ 363          void rsAppMain(void)
+ 364          {
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 7   
+
+ 365   1      #if (USE_BATT_MONITOR == TRUE) || (USE_LOW_BATT_IROUT == TRUE) || (USE_LOW_BATT_LED == TRUE)
+ 366   1        byte    temp_backup_key;
+ 367   1      #endif
+ 368   1      
+ 369   1        while(1)
+ 370   1        {
+ 371   2          getkey(&key_buf[0]);
+ 372   2      
+ 373   2          // normal state ir out.
+ 374   2          if(curr_state == NORMAL_MODE)
+ 375   2          {
+ 376   3            if(!key_cnt)
+ 377   3            {
+ 378   4      #if (USE_SPECIAL_0FEH_5 == TRUE)
+ 379   4              if((Three_low_keyoff)&&(ramFormat.strMember.outorder[0]==0xfe)&&(ramFormat.strMember.outorder[1]==5)) 
+             -//Three low option0
+ 380   4              {
+ 381   5                pulse_stop();
+ 382   5                key_buf[0]=backup_key;
+ 383   5                backup_key=0xff;
+ 384   5                irout_n(1);
+ 385   5                Three_low_keyoff=0;
+ 386   5              }
+ 387   4      #endif
+ 388   4      
+ 389   4      #if (USE_STUCKKEY_TIMER == TRUE)
+ 390   4              StuckKeyTimer_Stop;
+ 391   4      #endif
+ 392   4              curr_source=backup_source;
+ 393   4              temp_backup_key = backup_key;
+ 394   4              backup_key=0xff;
+ 395   4              ContinueDoubleKey=0;
+ 396   4      
+ 397   4              if(ir_ok)
+ 398   4              {
+ 399   5                t1_int=1;
+ 400   5                while(t1_int!=2){}
+ 401   5                pulse_stop();
+ 402   5              }
+ 403   4              //device_led_off(IR_SENDING_LED);
+ 404   4      #if (USE_QUICKLY_KEY == TRUE)
+                      QuicklyKey_Delay();
+              #endif
+ 407   4      
+ 408   4      #if (USE_AVSHIFT_MODE == TRUE)
+ 409   4              if(avShiftMode_active)
+ 410   4              {
+ 411   5                device_led_on(IR_SENDING_LED);
+ 412   5                continue;
+ 413   5              }
+ 414   4      #endif
+ 415   4      
+ 416   4              device_led_off(IR_SENDING_LED);
+ 417   4      
+ 418   4              if(getkey_simple())
+ 419   4                continue;
+ 420   4      
+ 421   4      #if (USE_BATT_MONITOR == TRUE)
+ 422   4              Low_Voltage_Check(temp_backup_key);
+ 423   4      #endif
+ 424   4      
+ 425   4      #if (USE_LOW_BATT_IROUT == TRUE)
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 8   
+
+ 426   4              if((!keyCnt_inLow)&&(lvi_check_key == 2))
+ 427   4              {
+ 428   5                if(t0_wait_keyin_chk(2))
+ 429   5                {
+ 430   6                  keyCnt_inLow=LVI_CHECK_CNT;
+ 431   6                  continue;
+ 432   6                }
+ 433   5                else
+ 434   5                  Low_Voltage_CodeOut();
+ 435   5                
+ 436   5              }
+ 437   4      #endif
+ 438   4      #if (USE_LOW_BATT_LED == TRUE)
+ 439   4              else if((!keyCnt_inLow)&&(lvi_check_key == 1))
+ 440   4              {
+ 441   5                if(device_Led_blink_key_chk(LOW_BATTERY_LED, 10, 5, 5))
+ 442   5                {
+ 443   6                  keyCnt_inLow=LVI_CHECK_CNT;
+ 444   6                  device_led_off(LOW_BATTERY_LED);
+ 445   6                  continue;
+ 446   6                }
+ 447   5              }
+ 448   4      #endif
+ 449   4              keyCnt_inLow=LVI_CHECK_CNT;
+ 450   4      
+ 451   4              stop_define();
+ 452   4              ExtInt_init();
+ 453   4              Keyscan_Interrupt_On();
+ 454   4      
+ 455   4              Stop_Mode();
+ 456   4              
+ 457   4              Keyscan_Interrupt_Off();
+ 458   4              continue;
+ 459   4            }
+ 460   3            else
+ 461   3            {
+ 462   4              if(key_cnt==1)
+ 463   4              {   
+ 464   5                if((ContinueDoubleKey)&&(backup_key!=0xff))
+ 465   5                {
+ 466   6                  if(isNavigationKeyIn)
+ 467   6                    key_buf[0]=backup_key;
+ 468   6                }
+ 469   5                
+ 470   5                if(backup_key==0xff)
+ 471   5                {
+ 472   6                  backup_source=curr_source;
+ 473   6      #if (USE_TEST_MODE == TRUE)
+ 474   6                  Factory_Test_Process();
+ 475   6                  if(bTestModeEnable)
+ 476   6                    continue;
+ 477   6      #endif
+ 478   6                }
+ 479   5                else
+ 480   5                {
+ 481   6                  if(key_buf[0]!=backup_key)
+ 482   6                  {
+ 483   7                    if(ir_ok)
+ 484   7                    {
+ 485   8                      t1_int=1;
+ 486   8                      while(t1_int!=2){}
+ 487   8                      pulse_stop();
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 9   
+
+ 488   8      #if (USE_QUICKLY_KEY == TRUE)
+                              QuicklyKey_Delay();
+              #endif  
+ 491   8                    }
+ 492   7                  }
+ 493   6                }
+ 494   5      
+ 495   5                functionKeyProcess();
+ 496   5                continue;
+ 497   5              }//end of 1key        
+ 498   4              else if(key_cnt==2) //2key compare & setting in.
+ 499   4              {
+ 500   5                if(Check_Key_2keyNoStop(key_buf,key_buf+1))
+ 501   5                {
+ 502   6                  if(ir_ok)
+ 503   6                  {
+ 504   7                    t1_int=1;
+ 505   7                    while(t1_int!=2){}
+ 506   7                  }
+ 507   6                  curr_source=backup_source;
+ 508   6                  continue;
+ 509   6                }
+ 510   5      
+ 511   5                pulse_stop();
+ 512   5                device_led_off(IR_SENDING_LED);
+ 513   5                curr_source=backup_source;
+ 514   5                backup_key=0xff;
+ 515   5      #if (USE_QUICKLY_KEY == TRUE)
+                        QuicklyKey_Delay();
+              #endif
+ 518   5      
+ 519   5                Check_Key_InSetmode(key_buf,key_buf+1);
+ 520   5      
+ 521   5                switch(twokey_result)
+ 522   5                {
+ 523   6                  case  COMBO_KEYS_UR_SETUP:                  //TVPOWER & OK
+ 524   6                    if(SetModeIn_TimeCheck(COMBOKEY_TIMEOUT_S))
+ 525   6                    {
+ 526   7                      UR_SettingCommon(SRC_TV);
+ 527   7                      curr_state=SET_MODE_ENTRY;
+ 528   7                      Setting_Mode();
+ 529   7                      SetMode_StartTimeOut(SETUP_TIMEOUT_S);
+ 530   7                      device_Led_InSetUp(SET_ENTRY, SETTING_MODE_LED);
+ 531   7                      wait_getkey_simple();
+ 532   7                    }
+ 533   6                    break;
+ 534   6      
+ 535   6                  case  COMBO_KEYS_STB_SETUP:                 //STBPOWER & OK
+ 536   6                    if(SetModeIn_TimeCheck(COMBOKEY_TIMEOUT_S))
+ 537   6                    {
+ 538   7                      STB_SettingCommon();
+ 539   7                      curr_state=SET_MODE_ENTRY;
+ 540   7                      Setting_Mode();
+ 541   7                      SetMode_StartTimeOut(SETUP_TIMEOUT_S);
+ 542   7                      device_Led_InSetUp(SET_ENTRY, SETTING_MODE_LED);
+ 543   7                      wait_getkey_simple();
+ 544   7                    }
+ 545   6                    break;
+ 546   6      
+ 547   6                  case  COMBO_KEYS_FACTORY_DEFAULT:               //STBPOWER & RED
+ 548   6                    if(SetModeIn_TimeCheck(COMBOKEY_TIMEOUT2_S))
+ 549   6                    {
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 10  
+
+ 550   7                      FactoryDefault();
+ 551   7                      //device_Led_InSetUp(SET_OK, SETTING_MODE_LED);
+ 552   7                      device_Led_blink(SETTING_MODE_LED, 3, 4, 4);
+ 553   7                      device_led_off(SETTING_MODE_LED);
+ 554   7                      wait_getkey_simple();
+ 555   7                    }
+ 556   6                    break;
+ 557   6      
+ 558   6                  default:
+ 559   6                    backup_key=0xff;
+ 560   6                    break;
+ 561   6      
+ 562   6                }
+ 563   5              }//end of 2key check
+ 564   4      
+ 565   4              else if(key_cnt==3)
+ 566   4              {
+ 567   5                if(Check_Key_3keyNoStop(key_buf,key_buf+1,key_buf+2))
+ 568   5                {
+ 569   6                  if(ir_ok)
+ 570   6                  {
+ 571   7                    t1_int=1;
+ 572   7                    while(t1_int!=2){}
+ 573   7                  }
+ 574   6                  curr_source=backup_source;
+ 575   6                  continue;
+ 576   6                }
+ 577   5                pulse_stop();
+ 578   5                device_led_off(IR_SENDING_LED);
+ 579   5                curr_source=backup_source;
+ 580   5                backup_key=0xff;
+ 581   5              }
+ 582   4      
+ 583   4              else if(key_cnt==4)
+ 584   4              {
+ 585   5                if(Check_Key_4keyNoStop(key_buf,key_buf+1,key_buf+2,key_buf+3))
+ 586   5                {
+ 587   6                  if(ir_ok)
+ 588   6                  {
+ 589   7                    t1_int=1;
+ 590   7                    while(t1_int!=2){}
+ 591   7                  }
+ 592   6                  curr_source=backup_source;
+ 593   6                  continue;
+ 594   6                }
+ 595   5                pulse_stop();
+ 596   5                device_led_off(IR_SENDING_LED);
+ 597   5                curr_source=backup_source;
+ 598   5                backup_key=0xff;
+ 599   5              }
+ 600   4      
+ 601   4      #if 0
+                      else if(key_cnt==5)
+                      {
+                        if(Check_Key_5keyNoStop(key_buf,key_buf+1,key_buf+2,key_buf+3,key_buf+4))
+                        {
+                          if(ir_ok)
+                          {
+                            t1_int=1;
+                            while(t1_int!=2){}
+                          }
+                          curr_source=backup_source;
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 11  
+
+                          continue;
+                        }
+                        pulse_stop();
+                        device_led_off(IR_SENDING_LED);
+                        curr_source=backup_source;
+                        backup_key=0xff;
+                      }
+              #endif
+ 620   4              else
+ 621   4              {
+ 622   5                pulse_stop();
+ 623   5                device_led_off(IR_SENDING_LED);
+ 624   5                curr_source=backup_source;
+ 625   5                backup_key=0xff;
+ 626   5              }
+ 627   4            }//end of key in
+ 628   3          }//end of normal mode
+ 629   2          //set mode
+ 630   2          else
+ 631   2          {
+ 632   3            if(Timer0_65ms16_2)
+ 633   3            {
+ 634   4              if(key_cnt==1)
+ 635   4              {
+ 636   5                functionKeyProcess();
+ 637   5                continue;
+ 638   5              }
+ 639   4            }
+ 640   3            else
+ 641   3            {
+ 642   4              ReturnNormal();
+ 643   4            }
+ 644   3          }//end of set mode
+ 645   2        }// end of while
+ 646   1      }
+ 647          
+ 648          #if 1
+ 649          void chksum_cal(void)
+ 650          {
+ 651   1        byte  i, sum = 0;
+ 652   1        byte* pStartSetNo = set_no.set_reg;
+ 653   1      
+ 654   1        for(i=0; i<(BACKUP_SIZE-2); i++)    //BACKUP_SIZE-ChksumBYTE
+ 655   1        {
+ 656   2          sum += *pStartSetNo++;
+ 657   2        }
+ 658   1      
+ 659   1        chksum = sum;
+ 660   1      }
+ 661          #endif
+ 662          
+ 663          //---------------------------
+ 664          // key null
+ 665          //---------------------------
+ 666          void Key_NULL(void)
+ 667          {
+ 668   1        //  __no_operation();
+ 669   1      }
+ 670          
+ 671          //---------------------------
+ 672          // ir out n frame..
+ 673          // input -> i=0 -> max 3frame out.
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 12  
+
+ 674          //      i=2 -> continous out.
+ 675          //      i=3 ~~ n -> n frame out.
+ 676          //---------------------------
+ 677          void irout_n(unsigned char i)
+ 678          {
+ 679   1        if(backup_IrKeyBuf == IrKeyBuf)
+ 680   1          return;
+ 681   1      
+ 682   1        outframeNo=i;
+ 683   1      
+ 684   1        if(i==1)                //frame out. -> C&M
+ 685   1        {
+ 686   2          my_sub();
+ 687   2      #if (USE_IR_LEARN == TRUE)
+              #if (IRZIP_CARR_2BYTES == TRUE)
+                  if(!ir_zip.Tunion.Tstruct.Carrier)
+              #else
+                  if(!ir_zip.Tunion.data1[0])
+              #endif
+              #endif
+ 694   2          {
+ 695   3            if(ir_ok)
+ 696   3              while(keyholdcnt<outframeNo){}
+ 697   3            pulse_stop();
+ 698   3            device_led_off(IR_SENDING_LED);
+ 699   3      #if (USE_QUICKLY_KEY == TRUE)
+                    QuicklyKey_Delay();
+              #endif
+ 702   3            //getkey_wait();
+ 703   3          }
+ 704   2        }
+ 705   1        else if(i==0xff)
+ 706   1          my_sub();
+ 707   1      
+ 708   1        else if(i>=2)             //n frame out. -> auto search.
+ 709   1        {
+ 710   2          my_sub();
+ 711   2          if(ir_ok)
+ 712   2            while(keyholdcnt<outframeNo){}
+ 713   2          pulse_stop();
+ 714   2          //getkey_wait();
+ 715   2        }
+ 716   1      }
+ 717          
+ 718          void ReturnNormal(void)
+ 719          {
+ 720   1        curr_state=NORMAL_MODE;
+ 721   1        device_led_off(SETTING_MODE_LED);
+ 722   1        wait_getkey_simple();
+ 723   1        Timer0_65ms16_2=0;
+ 724   1      }
+ 725          
+ 726          void IgnoreKeyin(void)
+ 727          {
+ 728   1        Timer0_65ms16_2_Update(SETUP_TIMEOUT_S);
+ 729   1        wait_getkey_simple();
+ 730   1      }
+ 731          
+ 732          //------------------------------------
+ 733          // complete setting mdoe (digit,auto,punch,2'nd)
+ 734          //------------------------------------
+ 735          void Complete_SetMode(void)
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 13  
+
+ 736          {
+ 737   1        device_led_off(SETTING_MODE_LED);
+ 738   1      
+ 739   1      #if (USE_IR_LEARN == TRUE)
+                if(curr_state == SET_MODE_DIGIT || curr_state == SET_MODE_AUTO)
+                {
+                  Erase_LearnDevice();
+                }
+              #endif
+ 745   1      
+ 746   1        Save_Information_All();
+ 747   1      
+ 748   1        device_Led_InSetUp(SET_OK, SETTING_MODE_LED);
+ 749   1        ReturnNormal();
+ 750   1        wait_getkey_simple();
+ 751   1      }
+ 752          
+ 753          void Save_TvPower(void)
+ 754          {
+ 755   1        set_no.set_member.set_no.tv_src=setting_no;
+ 756   1        set_no.set_member.set_dev.tv_src=setting_device;
+ 757   1      }
+ 758          
+ 759          void Complete_Setup_TvPower(void)
+ 760          {
+ 761   1        Save_TvPower();
+ 762   1      }
+ 763          
+ 764          #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 765          void Save_StbPower(void)
+ 766          {
+ 767   1        set_no.set_member.set_no.stb_src=setting_no;
+ 768   1        set_no.set_member.set_dev.stb_src=setting_device;
+ 769   1      }
+ 770          
+ 771          void Complete_Setup_StbPower(void)
+ 772          {
+ 773   1        Save_StbPower();
+ 774   1      }
+ 775          #endif
+ 776          
+ 777          void Complete_UrSetup(void)
+ 778          {
+ 779   1        switch(setting_source)
+ 780   1        {
+ 781   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 782   2          case  SRC_STB:
+ 783   2            Complete_Setup_StbPower();
+ 784   2            break;
+ 785   2      #endif
+ 786   2          case  SRC_TV:
+ 787   2            Complete_Setup_TvPower();
+ 788   2            break;
+ 789   2      
+ 790   2          default:
+ 791   2            Complete_Setup_TvPower();
+ 792   2            break;
+ 793   2        }
+ 794   1      
+ 795   1        backup_key=0xff;
+ 796   1        Complete_SetMode();
+ 797   1      }
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 14  
+
+ 798          
+ 799          //------------------------------------
+ 800          // check setting devcie
+ 801          //------------------------------------
+ 802          #if 0
+              void Check_SettingDevice(void)
+              {
+                switch(setting_source)
+                {
+                  case  SRC_TV:
+              #if (USE_2BYTE_SETTING_NO == FALSE)
+                    if(reg_key_buf[0]>=3)
+                    {
+                      setting_device=DEV_TV1;
+                      reg_key_buf[0]-=3;
+                    }
+                    else
+              #endif
+                      setting_device=DEV_TV;
+                    break;
+              
+                  case  SRC_STB:
+                    setting_device=DEV_STB;
+                    break;
+              
+                  default:
+                    setting_device=0xff;
+                    break;
+                }
+              }
+              #endif
+ 829          
+ 830          //------------------------------------
+ 831          // digit keys
+ 832          //------------------------------------
+ 833          void  DigitKeys_Common_SetMode(int8u digit)
+ 834          {
+ 835   1        if( (curr_state==SET_MODE_ENTRY) || (curr_state==SET_MODE_DIGIT) || (curr_state==SET_MODE_AUTO) )
+ 836   1        {
+ 837   2          curr_state=SET_MODE_DIGIT;
+ 838   2          setting_ok=FALSE;
+ 839   2      
+ 840   2          if(reg_key_max==2)
+ 841   2          {
+ 842   3            reg_key_buf[reg_key_max]=digit;
+ 843   3      
+ 844   3            //Check_SettingDevice();
+ 845   3      
+ 846   3          /* !!!important!!! - HardFault_Handler */
+ 847   3            if((setting_device==0xff)||(setting_device>MAX_DEVICE_NO))
+ 848   3            {
+ 849   4              device_Led_InSetUp(SET_NG, SETTING_MODE_LED);
+ 850   4              reg_key_max=0;
+ 851   4              reg_key_buf[0]=0;
+ 852   4              reg_key_buf[1]=0;
+ 853   4              reg_key_buf[2]=0;
+ 854   4              reg_key_buf[3]=0;
+ 855   4      
+ 856   4              wait_getkey_simple();
+ 857   4              return;
+ 858   4            }
+ 859   3          /* !!!important!!! - HardFault_Handler */
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 15  
+
+ 860   3      
+ 861   3            curr_device=setting_device;
+ 862   3      
+ 863   3            if( Get1CodeFrom3Buf((BYTE*)&reg_key_buf[0]) )    //3-frame out.
+ 864   3            {
+ 865   4              backup_key=0xff;
+ 866   4              switch(curr_device)
+ 867   4              {
+ 868   5                case  DEV_TV:
+ 869   5                case  DEV_TV1:
+ 870   5                  //key_buf[0]=KEY_TVPOWER;
+ 871   5                  IrKeyBuf = KEY_TVPOWER;
+ 872   5                  break;
+ 873   5      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 874   5                case  DEV_STB:
+ 875   5                  //key_buf[0]=KEY_STBPOWER;
+ 876   5                  IrKeyBuf = KEY_STBPOWER;
+ 877   5                  break;
+ 878   5      #endif
+ 879   5                default:
+ 880   5                  break;
+ 881   5              }
+ 882   4              power_toggle++;
+ 883   4      
+ 884   4              key_cnt=1;
+ 885   4      
+ 886   4              if((Panasonic_TV_Check(curr_device, setting_no))&&(IrKeyBuf==KEY_TVPOWER))
+ 887   4                irout_n(5);
+ 888   4              else
+ 889   4              {
+ 890   5      #if (USE_BATCH_SS_LG == TRUE)
+ 891   5                if(!batch_SS_LG_Common(curr_device, setting_no, IrKeyBuf))
+ 892   5      #endif
+ 893   5                  irout_n(3);
+ 894   5              }
+ 895   4      
+ 896   4              backup_key=0xff;
+ 897   4      
+ 898   4              setting_ok=TRUE;
+ 899   4              device_Led_blink(SETTING_MODE_LED, 1, 0, 3);
+ 900   4            }
+ 901   3            else
+ 902   3              device_Led_InSetUp(SET_NG, SETTING_MODE_LED);
+ 903   3      
+ 904   3            reg_key_max=0;
+ 905   3            reg_key_buf[0]=0;
+ 906   3            reg_key_buf[1]=0;
+ 907   3            reg_key_buf[2]=0;
+ 908   3            reg_key_buf[3]=0;
+ 909   3      
+ 910   3            wait_getkey_simple();
+ 911   3            return;
+ 912   3          }
+ 913   2          else
+ 914   2          {
+ 915   3            reg_key_buf[reg_key_max]=digit;
+ 916   3          }
+ 917   2          Timer0_65ms16_2_Update(SETUP_TIMEOUT_S);
+ 918   2      
+ 919   2          reg_key_max++;
+ 920   2          device_Led_blink(SETTING_MODE_LED, 1, 0, 3);
+ 921   2          wait_getkey_simple();
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 16  
+
+ 922   2        }
+ 923   1        else
+ 924   1          ReturnNormal();
+ 925   1      }
+ 926          
+ 927          //----------------------------------------
+ 928          // holding key in after ir out.
+ 929          //----------------------------------------
+ 930          void getSameKey_wait(void)
+ 931          {
+ 932   1        backup_key=key_buf[0];
+ 933   1        while(1)
+ 934   1        {
+ 935   2          getkey(&key_buf[0]);
+ 936   2          if(key_cnt==1)
+ 937   2          {
+ 938   3            if(backup_key!=key_buf[0])
+ 939   3              break;
+ 940   3            else
+ 941   3              continue;
+ 942   3          }
+ 943   2          else
+ 944   2            break;
+ 945   2        }
+ 946   1      }
+ 947          
+ 948          int8u Check_Key_2keyNoStop(int8u* key1, int8u* key2)
+ 949          {
+ 950   1        switch(*key1)
+ 951   1        {
+ 952   2          case KEY_NAVI_UP:
+ 953   2          case KEY_NAVI_DOWN:
+ 954   2          case KEY_NAVI_LEFT:
+ 955   2          case KEY_NAVI_RIGHT:
+ 956   2          //case KEY_OK:
+ 957   2            switch(*key2)
+ 958   2            {
+ 959   3              case  KEY_NAVI_UP:
+ 960   3              case  KEY_NAVI_DOWN:
+ 961   3              case  KEY_NAVI_LEFT:
+ 962   3              case  KEY_NAVI_RIGHT:
+ 963   3              //case  KEY_OK:
+ 964   3                twokey_result=0;
+ 965   3                break;
+ 966   3              default:
+ 967   3                twokey_result=0xff;
+ 968   3                break;
+ 969   3            }
+ 970   2            break;
+ 971   2      
+ 972   2          default:
+ 973   2            twokey_result=0xff;
+ 974   2            break;
+ 975   2      
+ 976   2        }
+ 977   1      
+ 978   1        if(twokey_result)
+ 979   1        {
+ 980   2          ContinueDoubleKey=0;
+ 981   2          return  FALSE;
+ 982   2        }
+ 983   1        else
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 17  
+
+ 984   1        {
+ 985   2          ContinueDoubleKey=1;
+ 986   2          return  TRUE;
+ 987   2        }
+ 988   1      }
+ 989          
+ 990          int8u Check_Key_3keyNoStop(int8u* key1, int8u* key2, int8u* key3)
+ 991          {
+ 992   1        switch(*key1)
+ 993   1        {
+ 994   2          case KEY_NAVI_UP:
+ 995   2          case KEY_NAVI_DOWN:
+ 996   2          case KEY_NAVI_LEFT:
+ 997   2          case KEY_NAVI_RIGHT:
+ 998   2          //case KEY_OK:
+ 999   2            switch(*key2)
+1000   2            {
+1001   3              case  KEY_NAVI_UP:
+1002   3              case  KEY_NAVI_DOWN:
+1003   3              case  KEY_NAVI_LEFT:
+1004   3              case  KEY_NAVI_RIGHT:
+1005   3              //case  KEY_OK:
+1006   3                switch(*key3)
+1007   3                {
+1008   4                  case  KEY_NAVI_UP:
+1009   4                  case  KEY_NAVI_DOWN:
+1010   4                  case  KEY_NAVI_LEFT:
+1011   4                  case  KEY_NAVI_RIGHT:
+1012   4                  //case  KEY_OK:
+1013   4                    twokey_result=0;
+1014   4                    break;
+1015   4                  default:
+1016   4                    twokey_result=0xff;
+1017   4                    break;
+1018   4                }
+1019   3                break;
+1020   3              default:
+1021   3                twokey_result=0xff;
+1022   3                break;
+1023   3            }
+1024   2            break;
+1025   2      
+1026   2          default:
+1027   2            twokey_result=0xff;
+1028   2            break;
+1029   2      
+1030   2        }
+1031   1      
+1032   1        if(twokey_result)
+1033   1        {
+1034   2          ContinueDoubleKey=0;
+1035   2          return  FALSE;
+1036   2        }
+1037   1        else
+1038   1        {
+1039   2          ContinueDoubleKey=1;
+1040   2          return  TRUE;
+1041   2        }
+1042   1      }
+1043          
+1044          int8u Check_Key_4keyNoStop(int8u* key1, int8u* key2, int8u* key3, int8u* key4)
+1045          {
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 18  
+
+1046   1        switch(*key1)
+1047   1        {
+1048   2          case KEY_NAVI_UP:
+1049   2          case KEY_NAVI_DOWN:
+1050   2          case KEY_NAVI_LEFT:
+1051   2          case KEY_NAVI_RIGHT:
+1052   2          //case KEY_OK:
+1053   2            switch(*key2)
+1054   2            {
+1055   3              case  KEY_NAVI_UP:
+1056   3              case  KEY_NAVI_DOWN:
+1057   3              case  KEY_NAVI_LEFT:
+1058   3              case  KEY_NAVI_RIGHT:
+1059   3              //case  KEY_OK:
+1060   3                switch(*key3)
+1061   3                {
+1062   4                  case  KEY_NAVI_UP:
+1063   4                  case  KEY_NAVI_DOWN:
+1064   4                  case  KEY_NAVI_LEFT:
+1065   4                  case  KEY_NAVI_RIGHT:
+1066   4                  //case  KEY_OK:
+1067   4                    switch(*key4)
+1068   4                    {
+1069   5                      case  KEY_NAVI_UP:
+1070   5                      case  KEY_NAVI_DOWN:
+1071   5                      case  KEY_NAVI_LEFT:
+1072   5                      case  KEY_NAVI_RIGHT:
+1073   5                      //case  KEY_OK:
+1074   5                        twokey_result=0;
+1075   5                        break;
+1076   5                      default:
+1077   5                        twokey_result=0xff;
+1078   5                        break;
+1079   5                    }
+1080   4                    break;
+1081   4                  default:
+1082   4                    twokey_result=0xff;
+1083   4                    break;
+1084   4                }
+1085   3                break;
+1086   3              default:
+1087   3                twokey_result=0xff;
+1088   3                break;
+1089   3            }
+1090   2            break;
+1091   2      
+1092   2          default:
+1093   2            twokey_result=0xff;
+1094   2            break;
+1095   2      
+1096   2        }
+1097   1      
+1098   1        if(twokey_result)
+1099   1        {
+1100   2          ContinueDoubleKey=0;
+1101   2          return  FALSE;
+1102   2        }
+1103   1        else
+1104   1        {
+1105   2          ContinueDoubleKey=1;
+1106   2          return  TRUE;
+1107   2        }
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 19  
+
+1108   1      }
+1109          
+1110          #if 0
+              int8u Check_Key_5keyNoStop(int8u* key1, int8u* key2, int8u* key3, int8u* key4, int8u* key5)
+              {
+                switch(*key1)
+                {
+                  case KEY_NAVI_UP:
+                  case KEY_NAVI_DOWN:
+                  case KEY_NAVI_LEFT:
+                  case KEY_NAVI_RIGHT:
+                  case KEY_OK:
+                    switch(*key2)
+                    {
+                      case  KEY_NAVI_UP:
+                      case  KEY_NAVI_DOWN:
+                      case  KEY_NAVI_LEFT:
+                      case  KEY_NAVI_RIGHT:
+                      case  KEY_OK:
+                        switch(*key3)
+                        {
+                          case  KEY_NAVI_UP:
+                          case  KEY_NAVI_DOWN:
+                          case  KEY_NAVI_LEFT:
+                          case  KEY_NAVI_RIGHT:
+                          case  KEY_OK:
+                            switch(*key4)
+                            {
+                              case  KEY_NAVI_UP:
+                              case  KEY_NAVI_DOWN:
+                              case  KEY_NAVI_LEFT:
+                              case  KEY_NAVI_RIGHT:
+                              case  KEY_OK:
+                                switch(*key5)
+                                {
+                                  case  KEY_NAVI_UP:
+                                  case  KEY_NAVI_DOWN:
+                                  case  KEY_NAVI_LEFT:
+                                  case  KEY_NAVI_RIGHT:
+                                  case  KEY_OK:
+                                  twokey_result=0;
+                                  break;
+                                  default:
+                                    twokey_result=0xff;
+                                    break;
+                                }
+                                break;
+                              default:
+                                twokey_result=0xff;
+                                break;
+                            }
+                            break;
+                          default:
+                            twokey_result=0xff;
+                            break;
+                        }
+                        break;
+                      default:
+                        twokey_result=0xff;
+                        break;
+                    }
+                    break;
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 20  
+
+              
+                  default:
+                    twokey_result=0xff;
+                    break;
+              
+                }
+              
+                if(twokey_result)
+                {
+                  ContinueDoubleKey=0;
+                  return  FALSE;
+                }
+                else
+                {
+                  ContinueDoubleKey=1;
+                  return  TRUE;
+                }
+              }
+              #endif
+1189          
+1190          void Other_Keys_Common(void)
+1191          {
+1192   1        if(curr_state == NORMAL_MODE)
+1193   1        {
+1194   2          IrKeyBuf = key_buf[0];
+1195   2          irout_n(0xff);
+1196   2        }
+1197   1        else if( (curr_state==SET_MODE_DIGIT) || (curr_state==SET_MODE_AUTO) )
+1198   1        {
+1199   2          if(setting_device != DEV_STB)
+1200   2          {
+1201   3            IgnoreKeyin();
+1202   3            return;
+1203   3          }
+1204   2      
+1205   2          switch(key_buf[0])
+1206   2          {
+1207   3            case  KEY_STBPOWER:
+1208   3              curr_device = setting_device;
+1209   3              IrKeyBuf = key_buf[0];
+1210   3              backup_key=0xff;
+1211   3              if(setting_ok)
+1212   3              {
+1213   4                irout_n(0xff);
+1214   4              }
+1215   3              getSameKey_wait();
+1216   3              if(ir_ok)
+1217   3              {
+1218   4                t1_int=1;
+1219   4                while(t1_int!=2){}
+1220   4              }
+1221   3              pulse_stop();
+1222   3              backup_key=key_buf[0];
+1223   3              reg_key_max=0;
+1224   3              reg_key_buf[0]=0;
+1225   3              reg_key_buf[1]=0;
+1226   3              reg_key_buf[2]=0;
+1227   3              reg_key_buf[3]=0;
+1228   3              Timer0_65ms16_2_Update(SETUP_TIMEOUT_S);
+1229   3              device_Led_blink(SETTING_MODE_LED, 1, 0, 3);
+1230   3              break;
+1231   3            case  KEY_EXIT:
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 21  
+
+1232   3              ReturnNormal();
+1233   3              break;
+1234   3            default:
+1235   3              //ReturnNormal();
+1236   3              backup_key=0xff;
+1237   3              IgnoreKeyin();
+1238   3              break;
+1239   3          }
+1240   2        }
+1241   1        else
+1242   1        {
+1243   2          IgnoreKeyin();
+1244   2        }
+1245   1      }
+1246          
+1247          void Other_TV_Keys_Common(void)
+1248          {
+1249   1        IrKeyBuf = key_buf[0];
+1250   1      
+1251   1        if(curr_state == NORMAL_MODE)
+1252   1        {
+1253   2          switch(key_buf[0])
+1254   2          {
+1255   3            case  KEY_TVPOWER:
+1256   3            case  KEY_INPUT:
+1257   3      #if (USE_BATCH_SS_LG == TRUE)
+1258   3              if(batch_SS_LG_Common(curr_device, set_no.set_member.set_no.tv_src, key_buf[0]))
+1259   3              {
+1260   4                getSameKey_wait();
+1261   4      #if (USE_QUICKLY_KEY == TRUE)
+                        QuicklyKey_Delay();
+              #endif
+1264   4              }
+1265   3              else
+1266   3      #endif
+1267   3                irout_n(0xff);
+1268   3              break;
+1269   3            case  KEY_TVVOLUP:
+1270   3            case  KEY_TVVOLDOWN:
+1271   3      #if (USE_BATCH_SS_LG == TRUE)
+1272   3              if(batch_SS_LG_Common(curr_device, set_no.set_member.set_no.tv_src, key_buf[0]))
+1273   3              {
+1274   4                device_led_on(IR_SENDING_LED);
+1275   4      
+1276   4                //T0CR&=~0x01;
+1277   4                //t0_wait(1);
+1278   4                Delayby10us(3171);
+1279   4              }
+1280   3              else
+1281   3      #endif
+1282   3                irout_n(0xff);
+1283   3              break;
+1284   3            default:
+1285   3              irout_n(0xff);
+1286   3              break;
+1287   3          }
+1288   2        }
+1289   1        else if( (curr_state==SET_MODE_DIGIT) || (curr_state==SET_MODE_AUTO) )
+1290   1        {
+1291   2          if( !((setting_device == DEV_TV) || (setting_device == DEV_TV1)) )
+1292   2          {
+1293   3            IgnoreKeyin();
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 22  
+
+1294   3            return;
+1295   3          }
+1296   2          switch(key_buf[0])
+1297   2          {
+1298   3            case  KEY_TVPOWER:
+1299   3              curr_device = setting_device;
+1300   3              IrKeyBuf = key_buf[0];
+1301   3              backup_key=0xff;
+1302   3              if(setting_ok)
+1303   3              {
+1304   4      #if (USE_BATCH_SS_LG == TRUE)
+1305   4                if(!batch_SS_LG_Common(curr_device, setting_no, IrKeyBuf))
+1306   4      #endif
+1307   4                  irout_n(0xff);
+1308   4              }
+1309   3              getSameKey_wait();
+1310   3              if(ir_ok)
+1311   3              {
+1312   4                t1_int=1;
+1313   4                while(t1_int!=2){}
+1314   4              }
+1315   3              pulse_stop();
+1316   3              backup_key=key_buf[0];
+1317   3              reg_key_max=0;
+1318   3              reg_key_buf[0]=0;
+1319   3              reg_key_buf[1]=0;
+1320   3              reg_key_buf[2]=0;
+1321   3              reg_key_buf[3]=0;
+1322   3              Timer0_65ms16_2_Update(SETUP_TIMEOUT_S);
+1323   3              device_Led_blink(SETTING_MODE_LED, 1, 0, 3);
+1324   3              break;
+1325   3            case  KEY_EXIT:
+1326   3              ReturnNormal();
+1327   3              break;
+1328   3            default:
+1329   3              //ReturnNormal();
+1330   3              backup_key=0xff;
+1331   3              IgnoreKeyin();
+1332   3              break;
+1333   3          }
+1334   2        }
+1335   1        else
+1336   1        {
+1337   2          //ReturnNormal();
+1338   2          IgnoreKeyin();
+1339   2        }
+1340   1      }
+1341          
+1342          void Key_Common_Digit(int8u digit)
+1343          {
+1344   1        if(curr_state!=NORMAL_MODE)
+1345   1        {
+1346   2          DigitKeys_Common_SetMode(digit);
+1347   2        }
+1348   1        else
+1349   1        {
+1350   2          Other_Keys_Common();
+1351   2        }
+1352   1      }
+1353          
+1354          void  Key_0(void)
+1355          {
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 23  
+
+1356   1        Key_Common_Digit(0);
+1357   1      }
+1358          
+1359          void  Key_1(void)
+1360          {
+1361   1        Key_Common_Digit(1);
+1362   1      }
+1363          
+1364          void  Key_2(void)
+1365          {
+1366   1        Key_Common_Digit(2);
+1367   1      }
+1368          
+1369          void  Key_3(void)
+1370          {
+1371   1        Key_Common_Digit(3);
+1372   1      }
+1373          
+1374          void  Key_4(void)
+1375          {
+1376   1        Key_Common_Digit(4);
+1377   1      }
+1378          
+1379          void  Key_5(void)
+1380          {
+1381   1        Key_Common_Digit(5);
+1382   1      }
+1383          
+1384          void  Key_6(void)
+1385          {
+1386   1        Key_Common_Digit(6);
+1387   1      }
+1388          
+1389          void  Key_7(void)
+1390          {
+1391   1        Key_Common_Digit(7);
+1392   1      }
+1393          
+1394          void  Key_8(void)
+1395          {
+1396   1        Key_Common_Digit(8);
+1397   1      }
+1398          
+1399          void  Key_9(void)
+1400          {
+1401   1        Key_Common_Digit(9);
+1402   1      }
+1403          
+1404          
+1405          //------------------------------------
+1406          // auto_search keys
+1407          //------------------------------------
+1408          void auto_search_Common(void)
+1409          {
+1410   1        if(curr_state==SET_MODE_ENTRY)
+1411   1        {
+1412   2          curr_state=SET_MODE_AUTO;
+1413   2      
+1414   2          if(key_buf[0]==KEY_CHUP)
+1415   2            auto_search_1(1);
+1416   2          else
+1417   2            auto_search_1(0);
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 24  
+
+1418   2        }
+1419   1        else if((curr_state==SET_MODE_AUTO)||(curr_state==SET_MODE_DIGIT))
+1420   1        {
+1421   2          curr_state=SET_MODE_AUTO;
+1422   2      
+1423   2          if(key_buf[0]==KEY_CHUP)
+1424   2            auto_search_1(1);
+1425   2          else
+1426   2            auto_search_1(0);
+1427   2        }
+1428   1        else
+1429   1        {
+1430   2          Other_Keys_Common();
+1431   2        }
+1432   1      }
+1433          
+1434          void Key_CHUP(void)
+1435          {
+1436   1        auto_search_Common();
+1437   1      }
+1438          void Key_CHDOWN(void)
+1439          {
+1440   1        auto_search_Common();
+1441   1      }
+1442          
+1443          void Key_SEARCH(void)
+1444          {
+1445   1        if(curr_state==SET_MODE_ENTRY)
+1446   1        {
+1447   2          Code_Read_Out();
+1448   2          ReturnNormal();
+1449   2        }
+1450   1        else
+1451   1          Other_Keys_Common();
+1452   1      }
+1453          
+1454          #if (USE_AVSHIFT_MODE == TRUE)
+1455          void avShiftMode_Keys_Common(void)
+1456          {
+1457   1        if(curr_state==NORMAL_MODE)
+1458   1        {
+1459   2          if(avShiftMode_active)
+1460   2          {
+1461   3            if(set_no.set_member.set_no.tv_src)
+1462   3            {
+1463   4              curr_source=SRC_TV;
+1464   4              setting_no=set_no.set_member.set_no.tv_src;
+1465   4              curr_device=set_no.set_member.set_dev.tv_src;
+1466   4              IrKeyBuf = key_buf[0];
+1467   4      
+1468   4              device_led_off(IR_SENDING_LED);
+1469   4      
+1470   4      #if (USE_BATCH_SS_LG == TRUE)
+1471   4              if(batch_SS_LG_Common(curr_device, setting_no, IrKeyBuf))
+1472   4              {
+1473   5                if(isNavigationKeyIn)
+1474   5                {
+1475   6                  //device_led_on(IR_SENDING_LED);
+1476   6      
+1477   6                  //T0CR&=~0x01;
+1478   6                  //t0_wait(1);
+1479   6                  Delayby10us(6700);
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 25  
+
+1480   6                }
+1481   5                else
+1482   5                  getSameKey_wait();
+1483   5              }
+1484   4              else
+1485   4      #endif
+1486   4                irout_n(0xff);
+1487   4      
+1488   4              Timer0_avShiftMode_Update(AVSHIFT_TIMEOUT_S);
+1489   4            }
+1490   3            else
+1491   3              Other_Keys_Common();
+1492   3          }
+1493   2          else
+1494   2            Other_Keys_Common();
+1495   2      
+1496   2        }
+1497   1        else
+1498   1          Other_Keys_Common();
+1499   1      }
+1500          #endif
+1501          
+1502          void Key_OK(void)
+1503          {
+1504   1        if((curr_state==SET_MODE_ENTRY)||(curr_state==SET_MODE_DIGIT)||(curr_state==SET_MODE_AUTO))
+1505   1        {
+1506   2          if(setting_ok)
+1507   2            Complete_UrSetup();
+1508   2          else
+1509   2            ReturnNormal();
+1510   2        }
+1511   1        else
+1512   1        {
+1513   2      #if (USE_AVSHIFT_MODE == TRUE)
+1514   2          avShiftMode_Keys_Common();
+1515   2          avShiftMode_active = 0;
+1516   2      #else
+                  Other_Keys_Common();
+              #endif
+1519   2        }
+1520   1      }
+1521          
+1522          void Key_ALLPOWER(void)
+1523          {
+1524   1        if(curr_state==NORMAL_MODE)
+1525   1        {
+1526   2          if(backup_key!=0xff)
+1527   2            return;
+1528   2      
+1529   2          power_toggle++;
+1530   2      
+1531   2          curr_source=SRC_TV;
+1532   2          setting_no=set_no.set_member.set_no.tv_src;
+1533   2          curr_device=set_no.set_member.set_dev.tv_src;
+1534   2      
+1535   2          IrKeyBuf=KEY_TVPOWER;
+1536   2          if(Panasonic_TV_Check(curr_device, setting_no))
+1537   2          {
+1538   3            //key_buf[0]=KEY_TVPOWER;
+1539   3            PulseOut_Above_nFrame(5);
+1540   3            key_buf_old[0]=backup_key;
+1541   3            key_buf[0]=backup_key;
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 26  
+
+1542   3            backup_key=0xff;
+1543   3          }
+1544   2          else
+1545   2          {
+1546   3      #if (USE_BATCH_SS_LG == TRUE)
+1547   3            if(!batch_SS_LG_Common(curr_device, setting_no, IrKeyBuf))
+1548   3      #endif
+1549   3            {
+1550   4              PulseOut_nFrame(3);
+1551   4            }
+1552   3          }
+1553   2      
+1554   2          //t0_wait(3);
+1555   2          Delayby10us(18050);
+1556   2      
+1557   2      
+1558   2          curr_source=SRC_STB;
+1559   2          setting_no=set_no.set_member.set_no.stb_src;
+1560   2          curr_device=set_no.set_member.set_dev.stb_src;
+1561   2      
+1562   2          //key_buf[0]=KEY_STBPOWER;
+1563   2          IrKeyBuf=KEY_STBPOWER;
+1564   2          PulseOut_nFrame(2);
+1565   2      
+1566   2          
+1567   2      #if (USE_QUICKLY_KEY == TRUE)
+                  QuicklyKey_Delay();
+              #endif
+1570   2        }
+1571   1        else
+1572   1          Other_Keys_Common();
+1573   1      }
+1574          
+1575          void Key_TVPOWER(void)
+1576          {
+1577   1        if(backup_key!=key_buf[0])
+1578   1          power_toggle++;
+1579   1      
+1580   1        if(curr_state == NORMAL_MODE)
+1581   1        {
+1582   2          curr_source=SRC_TV;
+1583   2          curr_device=*(set_no.set_reg+curr_source+(SRC_CNT*INC_PTR_SIZE));
+1584   2        }
+1585   1      
+1586   1        Other_TV_Keys_Common();
+1587   1      }
+1588          
+1589          void Key_TVVOLUP(void)
+1590          {
+1591   1        if(curr_state == NORMAL_MODE)
+1592   1        {
+1593   2          curr_source=SRC_TV;
+1594   2          curr_device=*(set_no.set_reg+curr_source+(SRC_CNT*INC_PTR_SIZE));
+1595   2        }
+1596   1      
+1597   1        Other_TV_Keys_Common();
+1598   1      }
+1599          void Key_TVVOLDOWN(void)
+1600          {
+1601   1        if(curr_state == NORMAL_MODE)
+1602   1        {
+1603   2          curr_source=SRC_TV;
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 27  
+
+1604   2          curr_device=*(set_no.set_reg+curr_source+(SRC_CNT*INC_PTR_SIZE));
+1605   2        }
+1606   1      
+1607   1        Other_TV_Keys_Common();
+1608   1      }
+1609          void Key_INPUT(void)
+1610          {
+1611   1        if(curr_state == NORMAL_MODE)
+1612   1        {
+1613   2          curr_source=SRC_TV;
+1614   2          curr_device=*(set_no.set_reg+curr_source+(SRC_CNT*INC_PTR_SIZE));
+1615   2        }
+1616   1      
+1617   1        Other_TV_Keys_Common();
+1618   1      
+1619   1      #if (USE_AVSHIFT_MODE == TRUE)
+1620   1        if(avShiftMode_active)
+1621   1        {
+1622   2          Timer0_avShiftMode_Update(AVSHIFT_TIMEOUT_S);
+1623   2        }
+1624   1        else
+1625   1        {
+1626   2          avShiftMode_active = 1;
+1627   2          avShiftMode_StartTimeOut(AVSHIFT_TIMEOUT_S);
+1628   2          device_led_on(IR_SENDING_LED);
+1629   2        }
+1630   1      #endif
+1631   1      }
+1632          
+1633          void Key_MENU(void)
+1634          {
+1635   1        Other_Keys_Common();
+1636   1      }
+1637          
+1638          void Key_NAVI_UP(void)
+1639          {
+1640   1      #if (USE_AVSHIFT_MODE == TRUE)
+1641   1        avShiftMode_Keys_Common();
+1642   1      #else
+                Other_Keys_Common();
+              #endif
+1645   1      }
+1646          void Key_NAVI_DOWN(void)
+1647          {
+1648   1      #if (USE_AVSHIFT_MODE == TRUE)
+1649   1        avShiftMode_Keys_Common();
+1650   1      #else
+                Other_Keys_Common();
+              #endif
+1653   1      }
+1654          void Key_NAVI_LEFT(void)
+1655          {
+1656   1      #if (USE_AVSHIFT_MODE == TRUE)
+1657   1        avShiftMode_Keys_Common();
+1658   1      #else
+                Other_Keys_Common();
+              #endif
+1661   1      }
+1662          void Key_NAVI_RIGHT(void)
+1663          {
+1664   1      #if (USE_AVSHIFT_MODE == TRUE)
+1665   1        avShiftMode_Keys_Common();
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 28  
+
+1666   1      #else
+                Other_Keys_Common();
+              #endif
+1669   1      }
+1670          
+1671          void Key_STBPOWER(void)
+1672          {
+1673   1        Other_Keys_Common();
+1674   1      }
+1675          void Key_VOLUP(void)
+1676          {
+1677   1        Other_Keys_Common();
+1678   1      }
+1679          void Key_VOLDOWN(void)
+1680          {
+1681   1        Other_Keys_Common();
+1682   1      }
+1683          void Key_MUTE(void)
+1684          {
+1685   1        Other_Keys_Common();
+1686   1      }
+1687          void Key_MOVIE(void)
+1688          {
+1689   1        Other_Keys_Common();
+1690   1      }
+1691          void Key_REVIEW(void)
+1692          {
+1693   1        Other_Keys_Common();
+1694   1      }
+1695          void Key_CHGUIDE(void)
+1696          {
+1697   1        Other_Keys_Common();
+1698   1      }
+1699          void Key_OPTION(void)
+1700          {
+1701   1        Other_Keys_Common();
+1702   1      }
+1703          void Key_BACK(void)
+1704          {
+1705   1        Other_Keys_Common();
+1706   1      }
+1707          void Key_EXIT(void)
+1708          {
+1709   1        Other_Keys_Common();
+1710   1      }
+1711          void Key_REW(void)
+1712          {
+1713   1        Other_Keys_Common();
+1714   1      }
+1715          void Key_PLAYPAUSE(void)
+1716          {
+1717   1        Other_Keys_Common();
+1718   1      }
+1719          void Key_STOP(void)
+1720          {
+1721   1        Other_Keys_Common();
+1722   1      }
+1723          void Key_FF(void)
+1724          {
+1725   1        Other_Keys_Common();
+1726   1      }
+1727          void Key_STAR(void)
+C51 COMPILER V9.60.0.0   FUNCTION_KEY                                                      12/02/2021 14:01:35 PAGE 29  
+
+1728          {
+1729   1        Other_Keys_Common();
+1730   1      }
+1731          void Key_SHARP(void)
+1732          {
+1733   1        Other_Keys_Common();
+1734   1      }
+1735          void Key_DELETE(void)
+1736          {
+1737   1        Other_Keys_Common();
+1738   1      }
+1739          void Key_HANENG(void)
+1740          {
+1741   1        Other_Keys_Common();
+1742   1      }
+1743          void Key_RED(void)
+1744          {
+1745   1        Other_Keys_Common();
+1746   1      }
+1747          void Key_GREEN(void)
+1748          {
+1749   1        Other_Keys_Common();
+1750   1      }
+1751          void Key_YELLOW(void)
+1752          {
+1753   1        Other_Keys_Common();
+1754   1      }
+1755          void Key_BLUE(void)
+1756          {
+1757   1        Other_Keys_Common();
+1758   1      }
+1759          void Key_MYMENU(void)
+1760          {
+1761   1        Other_Keys_Common();
+1762   1      }
+1763          void Key_SHOPPING(void)
+1764          {
+1765   1        Other_Keys_Common();
+1766   1      }
+1767          void Key_WIDGET(void)
+1768          {
+1769   1        Other_Keys_Common();
+1770   1      }
+1771          void Key_APPSTORE(void)
+1772          {
+1773   1        Other_Keys_Common();
+1774   1      }
+1775          #endif  //__FUNCTION_KEY_C__
+1776          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3953    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      2      37
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

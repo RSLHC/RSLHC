@@ -1,0 +1,150 @@
+C51 COMPILER V9.60.0.0   SC51F33XX_IT                                                      07/20/2021 14:05:38 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE SC51F33XX_IT
+OBJECT MODULE PLACED IN .\Output\sc51f33xx_it.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE user\src\sc51f33xx_it.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\..\..\Librari
+                    -es\sc51f3364_Periph_Driver\inc;..\..\..\Libraries\sc51f3364_Periph_Driver\src;.\user\inc;.\user\src;..\IR_Sample) DEBUG 
+                    -OBJECTEXTEND PRINT(.\Listing\sc51f33xx_it.lst) TABS(2) OBJECT(.\Output\sc51f33xx_it.obj)
+
+line level    source
+
+   1          /**
+   2            ******************************************************************************
+   3            * @file      sc51f33xx_it.c
+   4            * @author    MCU Application Team 
+   5            * @version   V1.0.0
+   6            * @date      12-Oct-2016
+   7            * @brief     user interrupt service functions
+   8            *            History:
+   9            *
+  10            ******************************************************************************
+  11            * @attention
+  12            *
+  13            * <h2><center>&copy; COPYRIGHT 2019 Silan Microelectronics </center></h2>
+  14            *
+  15            * THE PRESENT SOFTWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+  16            * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
+  17            * AS A RESULT, SILAN MICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
+  18            * INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
+  19            * CONTENT OF SUCH SOFTWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
+  20            * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+  21            *
+  22            * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  23            * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  24            * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  25            * DISCLAIMED.
+  26            * 
+  27            ******************************************************************************
+  28            */
+  29          #include "SC51F33XX.h"
+  30          #include "sc51f33xx_sys.h"
+  31          #include "sc51f33xx_hal_conf.h"
+  32          #include "ir.h"
+  33          
+  34          U16 g_u16num = 0;
+  35          /**
+  36            * @brief timer0 interrupt handler
+  37            * @note it will run ro here when kount fulled
+  38            * @retval None
+  39            */
+  40          //void Timer0Handle(void) interrupt 1
+  41          //{
+  42              /*general timing but code sending*/ 
+  43          //    if(g_TimeOutDec>0)
+  44          //    { 
+  45          //        g_TimeOutDec--;
+  46           //   } 
+  47          //    TF0 = 0;    /*hardware clear automatic in fact  */ 
+  48          //}
+  49          /**
+  50            * @brief timer1 interrupt handler
+  51            * @note it will run ro here when kount fulled
+  52            * @retval None
+  53            */
+C51 COMPILER V9.60.0.0   SC51F33XX_IT                                                      07/20/2021 14:05:38 PAGE 2   
+
+  54          //void Timer1Handle(void) interrupt 3
+  55          //{
+  56          //    TR1 = 0;
+  57          //    START_VALUE_TN_MODEN(T1,MODE1); /* <--  it needn't this value if working in mode 2   */
+  58          //    TR1 = 1;  
+  59          //    g_u16num++;
+  60          //    if(g_u16num == 1000)
+  61          //    {
+  62          //          P32 = 1;
+  63          //    }
+  64          //    else if(g_u16num == 2000)
+  65          //    {
+  66          //          P32 = 0;
+  67          //          g_u16num = 0;
+  68          //    }
+  69          //}
+  70          /**
+  71            * @brief timer2 interrupt handler
+  72            * @note it will run ro here when kount fulled
+  73            * @retval None
+  74            */
+  75          void Timer2Handle(void) interrupt 5
+  76          {
+  77   1        if(EXF2)
+  78   1        {       
+  79   2              gp_StdRecData[g_SampArrIndex] = (RCAP2H << 8) + RCAP2L;
+  80   2          //gp_SampArr[g_SampArrIndex]=(RCAP2H<<8)+RCAP2L;
+  81   2          gb_SampStar = 1;   
+  82   2          T2CON1  = 0x0D;
+  83   2          g_SampArrIndex++;
+  84   2          
+  85   2          if (g_SampArrIndex >= C_MaxWaveLenSTD)
+  86   2          {
+  87   3                  gb_SampStop = 1;
+  88   3                  TR2 = 0;
+  89   3          }
+  90   2        }
+  91   1        else
+  92   1        {
+  93   2          if (gb_SampStar)
+  94   2            {
+  95   3                  gb_SampStop = 1;
+  96   3                  TR2 = 0;          /*sample over*/
+  97   3              }
+  98   2        }
+  99   1        TF2 = 0;
+ 100   1      }
+ 101          
+ 102          #if 0
+              /**
+                * @brief  CRT demodulation interruption function ,sample carrier wave
+                * @note   it will sample six value,and useless of the first one
+                * @retval None
+                */
+              void CarrerIntProc(void) interrupt 14
+              {
+                if (CRTCON1&0x02)
+                {
+                  if (g_SampCarrierIndex<C_MaxCarrierLen)
+                {
+                  ga_CarrierArr[g_SampCarrierIndex] = CRTDATA1;
+                  g_SampCarrierIndex++;
+C51 COMPILER V9.60.0.0   SC51F33XX_IT                                                      07/20/2021 14:05:38 PAGE 3   
+
+                }
+                }  
+                CRTCON1&=0xFC;  
+              }
+              #endif
+ 121          /******************** (C) COPYRIGHT Silan Microelectronics *****END OF FILE****/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     90    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      2    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

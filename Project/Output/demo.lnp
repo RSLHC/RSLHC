@@ -1,0 +1,13 @@
+".\Output\common.obj",
+".\Output\crt.obj",
+".\Output\flash.obj",
+".\Output\function_key.obj",
+".\Output\hal.obj",
+".\Output\main.obj",
+".\Output\ram.obj",
+".\Output\rom.obj",
+".\Output\special.obj",
+".\Output\sysclk.obj",
+".\Output\DATA.obj" 
+TO ".\Output\demo" 
+PRINT(".\Listing\demo.m51") RAMSIZE(256) 

@@ -1,0 +1,113 @@
+C51 COMPILER V9.60.0.0   DELAY                                                             07/20/2021 14:05:39 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE DELAY
+OBJECT MODULE PLACED IN .\Output\delay.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\Libraries\sc51f3364_Periph_Driver\src\delay.c OPTIMIZE(8,SPEED)
+                    - BROWSE INCDIR(..\..\..\Libraries\sc51f3364_Periph_Driver\inc;..\..\..\Libraries\sc51f3364_Periph_Driver\src;.\user\inc;
+                    -.\user\src;..\IR_Sample) DEBUG OBJECTEXTEND PRINT(.\Listing\delay.lst) TABS(2) OBJECT(.\Output\delay.obj)
+
+line level    source
+
+   1          /**
+   2          ********************************************************************************
+   3          * @file      delay.c
+   4          * @author    zhouzhongliang 
+   5          * @version   V1.0.0
+   6          * @date      12/10/2015
+   7          * @brief     3364 software delay
+   8          ********************************************************************************
+   9          * History:
+  10          * 12/10/2015 V1.0.0
+  11          ********************************************************************************
+  12          * THE PRESENT SOFTWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+  13          * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
+  14          * AS A RESULT, SLMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
+  15          * INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
+  16          * CONTENT OF SUCH SOFTWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
+  17          * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+  18          *
+  19          * THIS SOURCE CODE IS PROTECTED BY A LICENSE.
+  20          * FOR MORE INFORMATION PLEASE CAREFULLY READ THE LICENSE AGREEMENT FILE LOCATED
+  21          * IN THE ROOT DIRECTORY OF THIS FIRMWARE PACKAGE.
+  22          * <h2><center>&copy; COPYRIGHT 2019 Silan Microelectronics </center></h2>
+  23          ********************************************************************************
+  24          */
+  25          #include <INTRINS.H>
+  26          #include "SC51F33XX.h"
+  27          #include "sc51f33xx_sys.h"
+  28          #include "sc51f33xx_hal_conf.h"
+  29          #include "wdt.h"
+  30          #include "delay.h"
+  31          
+  32          /**
+  33            * @brief delay function
+  34            * @param u16DelayMS unit is ms  
+  35            * @retval None
+  36            * @pre must define the value of MCLK_SOURCE and EX_OSC_FREQ, see sc51f33xx_hal_conf.h
+  37            * @note delay time should be less than WDT overflow time
+  38            * @note ClrWDT() was called when entered this fucntion, and called again before 
+  39            * exiting this function
+  40            */
+  41          void DelayMS(u16 u16DelayMS)
+  42          {
+  43   1        U8 i,j;  
+  44   1          i = MCKSET & 0x03;
+  45   1          u16DelayMS <<= i;
+  46   1          i = 95;
+  47   1          #if MCLK_SOURCE == 1
+                  i = i * EX_OSC_RATIO;
+                  #endif
+  50   1          ClrWDT();
+  51   1        while(u16DelayMS--)
+  52   1        {
+  53   2              for(j=0;j < i;j++)
+C51 COMPILER V9.60.0.0   DELAY                                                             07/20/2021 14:05:39 PAGE 2   
+
+  54   2                  _nop_(); 
+  55   2        }
+  56   1          ClrWDT();
+  57   1      }
+  58          
+  59          ///**
+  60          //  * @brief Delay10US function
+  61          //  * @param 
+  62          //  */
+  63          //void Delay10US(u16 u16Delay10US)
+  64          //{
+  65          //    ClrWDT();
+  66          //  while(u16Delay10US--)
+  67          //  {
+  68          //         _nop_(); _nop_();_nop_();_nop_(); _nop_();_nop_();_nop_(); _nop_();_nop_();_nop_();
+  69          //  }
+  70          //    ClrWDT();
+  71          //}
+  72          
+  73          /**
+  74            * @brief delay function
+  75            * @param 
+  76            */
+  77          void delay(U8 i)
+  78          {
+  79   1        U16 j;
+  80   1        while(i--)
+  81   1        {
+  82   2          j = 0x10;
+  83   2          while(j--);
+  84   2        } 
+  85   1      }
+  86          /******************** (C) COPYRIGHT Silan Microelectronics *****END OF FILE****/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     89    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

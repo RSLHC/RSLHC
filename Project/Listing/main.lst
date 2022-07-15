@@ -1,0 +1,442 @@
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Output\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Lis
+                    -ting\main.lst) TABS(2) OBJECT(.\Output\main.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __MAIN_C__
+   3          #define __MAIN_C__
+   4          
+   5          /**************************************************************************************************
+   6           *                                            INCLUDES
+   7           **************************************************************************************************/
+   8          #include "main.h"
+   9          #include "hal.h"
+  10          #include "common.h"
+  11          #include "function_key.h"
+  12          #include "crt.h"
+  13          
+  14          /**************************************************************************************************
+  15           *                                        FUNCTIONS - API
+  16           **************************************************************************************************/
+  17          /*****************************************************************************/
+  18          /* Main Routine */
+  19          /*****************************************************************************/
+  20          
+  21          void main(void)
+  22          {
+  23   1        HAL_GLOBAL_INTERRUPT_DIS();
+  24   1      
+  25   1        SystemInit();
+  26   1        InitPort();
+  27   1        reset_define();
+  28   1        rsAppMain();
+  29   1      }
+  30          
+  31          
+  32          /*****************************************************************************
+  33           *  DESCRIPTION:    Begins Stop mode,
+  34           *
+  35           *  PARAMETERS:     None
+  36           *
+  37           *  RETURNS:        None
+  38           *****************************************************************************/
+  39          void Stop_Mode(void)
+  40          {
+  41   1        EA = 1;
+  42   1      
+  43   1        /* to reduce power consumption, close internal VBG, closed LVR, LVD functions */
+  44   1          /* But if xSTOPCFG.3(PWRCFG)==1, the LVRCON must be kept enabled before go to stop mode, 
+  45   1             then the LVR(VBG) automatically closed by hardware when entered stop mode, and it will be 
+  46   1             enabled again at the time waking from stop mode by hardware */
+  47   1          if(xSTOPCFG & 0x08) /* very important here */
+  48   1          {
+  49   2            LVRCON |= 0x20; 
+  50   2              /* if LVR not enabled before, code here to be wrote: delay 20us */
+  51   2              LVRCON |= 0x80;
+  52   2          }
+  53   1          /* make sure the two WPKEY and PCON consecutive instructions 
+  54   1             are not interrupted*/
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 2   
+
+  55   1          /* make sure no KBI key pressed, if not, the entering to stop
+  56   1             mode won't be succeed */
+  57   1        WPKEY = 0x37;
+  58   1        PCON = 0x02;  /* goto stop mode, 
+  59   1                           if succeed, instuction will stop here, 
+  60   1                           if failed, go to the next instruction */
+  61   1          /* waked up , LVR enabled again by hardware if((xSTOPCFG.3==1) and (LVR enabled before go to stop mode
+             -)) */
+  62   1          _nop_();
+  63   1          _nop_();
+  64   1      }
+  65          
+  66          
+  67          void External_Interrupt_0() interrupt 0
+  68          {
+  69   1      }
+  70          
+  71          void Timer0_Interrupt(void) interrupt 1 //65ms 
+  72          {
+  73   1        if(Timer0_65ms16)   Timer0_65ms16--;
+  74   1      
+  75   1        if(Timer0_65ms16_2)   Timer0_65ms16_2--;
+  76   1      
+  77   1        if(Timer0_keyin_chk)  Timer0_keyin_chk--;
+  78   1        
+  79   1      #if (USE_AVSHIFT_MODE == TRUE)
+  80   1        if(Timer0_avShiftMode)  
+  81   1          Timer0_avShiftMode--;
+  82   1      
+  83   1        if(!Timer0_avShiftMode) 
+  84   1          avShiftMode_active = 0;
+  85   1      #endif
+  86   1      
+  87   1      }
+  88          
+  89          void External_Interrupt_1() interrupt 2
+  90          {
+  91   1      }
+  92          
+  93          
+  94          void Timer1_Interrupt(void) interrupt 3 //1sec
+  95          {
+  96   1        #if (USE_STUCKKEY_TIMER == TRUE)
+  97   1        if(curr_state == NORMAL_MODE)
+  98   1        {
+  99   2          #if 1
+ 100   2          // StuckKey time
+ 101   2          if(Timer1_1sec08)
+ 102   2          {
+ 103   3            Timer1_1sec08--;
+ 104   3          }
+ 105   2          else
+ 106   2          {
+ 107   3            StuckKeyTimer_Stop;
+ 108   3            CRT_Stop;
+ 109   3            CRT_onoff(CRT_OFF);
+ 110   3            ir_ok = FALSE;
+ 111   3            t1_int = 2;
+ 112   3            device_led_off(IR_SENDING_LED);
+ 113   3            while(getkey_simple()){}
+ 114   3            my_newkeyincond();
+ 115   3          }
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 3   
+
+ 116   2          #endif
+ 117   2        }
+ 118   1      #endif
+ 119   1      
+ 120   1      #if (USE_IR_LEARN == TRUE)
+                else if(curr_state == SET_MODE_LEARN)
+                {   
+                  if(NoSinalCnt)
+                  {
+                    NoSinalCnt--;
+                    bT3OverFlow = TRUE;
+                  }
+                  else
+                  {
+                    /* Interrupt Disable */
+                    //IE2 &= ~(1<<INT16E_Timer3); /* Disable Timer 3 Interrupt */
+              
+                    // Any carriery
+                    if(ipc_cnt == 0 && learn_type == CARRIER_TYPE)
+                    {
+                      //IR capture mode is disabled
+                      IRCC1 &= _0111_1111B;
+                      *pStream16u++ = 0xFFFF;
+                      ipc_cnt++;
+                    }
+              
+                    return_int8u = 1;
+                  }
+                }
+              #endif
+ 146   1      
+ 147   1        
+ 148   1      }
+ 149          
+ 150          void UART0_Interrupt() interrupt 4
+ 151          {
+ 152   1      }
+ 153          
+ 154          void Spectial_F0_High_Envelop()
+ 155          {
+ 156   1        CRT_Run;                          //high pointer
+ 157   1        if (ramFormat.strMember.timeval[0] == 3)
+ 158   1          Delayby10us(11);
+ 159   1        else            
+ 160   1          Delayby10us(1);
+ 161   1        CRT_Stop;
+ 162   1      }
+ 163          
+ 164          void Timer2_Interrupt(void) interrupt 5 using 1 //Envelop Timer
+ 165          {
+ 166   1        //flash type.
+ 167   1        if(ramFormat.strMember.option1.flash)
+ 168   1        {
+ 169   2      #if (USE_SPECIAL_0F0H == TRUE)
+ 170   2          if(ramFormat.strMember.outorder[0] == 0xf0)     // 0FO Special 
+ 171   2          {
+ 172   3            if( (reload_time == FALSE))
+ 173   3            {
+ 174   4              if(before_reload_state == TRUE)
+ 175   4              {
+ 176   5                before_reload_state = FALSE;
+ 177   5                CRT_Stop;
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 4   
+
+ 178   5              }
+ 179   4              else
+ 180   4                Spectial_F0_High_Envelop();
+ 181   4            }
+ 182   3            else
+ 183   3            {
+ 184   4              if(before_reload_state == TRUE)
+ 185   4              {
+ 186   5                if(continuous_reload == FALSE)          
+ 187   5                  Spectial_F0_High_Envelop();
+ 188   5              }
+ 189   4            }
+ 190   3            
+ 191   3            if( (wTimer&0x7FFF) > wTimer_Max)
+ 192   3            {
+ 193   4              Envelop_time = Envelop_time_max;
+ 194   4              Envelop_counter = Envelop_counter_max; 
+ 195   4              wTimer -= wTimer_Max;
+ 196   4              if(before_reload_state == TRUE)
+ 197   4                continuous_reload = TRUE;
+ 198   4              else
+ 199   4                continuous_reload = FALSE;
+ 200   4              reload_time = TRUE;
+ 201   4              before_reload_state = TRUE;
+ 202   4            }
+ 203   3            else
+ 204   3            {
+ 205   4              Envelop_time = (carrier_time_us*(wTimer&0x7FFF)); 
+ 206   4              Envelop_counter = 65536 - (Envelop_time / 2) - ((carrier_time_ns * (wTimer&0x7FFF)/10)/2); //Timing �
+             -�산으로 인해 발생한 nsec 단위 손실에 대한 보상 값
+ 207   4              uptr_Timer++;                     //next high pointer
+ 208   4              wTimer = *uptr_Timer;
+ 209   4              reload_time = FALSE;
+ 210   4            }
+ 211   3      
+ 212   3            RCAP2H = (Envelop_counter >> 8);
+ 213   3            RCAP2L = Envelop_counter & 0x00FF;
+ 214   3          }
+ 215   2          else
+ 216   2      #endif
+ 217   2          {
+ 218   3            if( Before_CRT_State == RUN)
+ 219   3              CRT_Run;
+ 220   3      
+ 221   3            Delayby10us(1); 
+ 222   3            CRT_Stop;
+ 223   3          
+ 224   3            if(wTimer & 0x8000)
+ 225   3              Before_CRT_State = RUN;
+ 226   3            else 
+ 227   3              Before_CRT_State = STOP;
+ 228   3      
+ 229   3      
+ 230   3            if(reload_time == FALSE)
+ 231   3            {
+ 232   4              uptr_Timer++;                     //next high pointer
+ 233   4              wTimer = *uptr_Timer;
+ 234   4            }
+ 235   3      
+ 236   3            if(non_special_flash_start == TRUE)
+ 237   3            {
+ 238   4              non_special_flash_start = FALSE;
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 5   
+
+ 239   4              uptr_Timer++;                     //next high pointer
+ 240   4              wTimer = *uptr_Timer;
+ 241   4            }
+ 242   3      
+ 243   3      
+ 244   3            if( (wTimer&0x7FFF) > wTimer_Max)
+ 245   3            {
+ 246   4              Envelop_time = Envelop_time_max;
+ 247   4              Envelop_counter = Envelop_counter_max; //Timing 계산으로 인해 발생한 nsec 단위 손실에 �
+             -�한 보상 값
+ 248   4              wTimer -= wTimer_Max;
+ 249   4              reload_time = TRUE;
+ 250   4            }
+ 251   3            else
+ 252   3            {
+ 253   4              Envelop_time = (carrier_time_us*(wTimer&0x7FFF)); 
+ 254   4              Envelop_counter = 65536 - (Envelop_time / 2) - ((carrier_time_ns * (wTimer&0x7FFF)/10)/2); //Timing �
+             -�산으로 인해 발생한 nsec 단위 손실에 대한 보상 값
+ 255   4              uptr_Timer++;                     //next high pointer
+ 256   4              wTimer = *uptr_Timer;
+ 257   4              reload_time = FALSE;
+ 258   4            }
+ 259   3      
+ 260   3            RCAP2H = (Envelop_counter >> 8);
+ 261   3            RCAP2L = Envelop_counter & 0x00FF;
+ 262   3          }
+ 263   2        }
+ 264   1        //carrier type
+ 265   1        else
+ 266   1        {
+ 267   2      #if (USE_SPECIAL_0F4H == TRUE)
+ 268   2          if(ramFormat.strMember.outorder[0] == 0xf4)   // 0F4 Special 
+ 269   2          {
+ 270   3            F4_carrier = pramCode->Tunion.Tstruct.bCarrierArray[f4_cnt++];
+ 271   3      
+ 272   3            if (reload_time == TRUE)
+ 273   3            {
+ 274   4              f4_cnt--;
+ 275   4              reload_time = FALSE;
+ 276   4            }
+ 277   3      
+ 278   3            if(F4_carrier == 0x70 || F4_carrier == 0x6f)  F4_carrier = 115; //34.7KHz
+ 279   3            else                      F4_carrier = 104; //38.4KHz
+ 280   3      
+ 281   3            F4_carrier = F4_carrier*2;
+ 282   3            
+ 283   3            carrier_time_us =  (125 * F4_carrier) / 1000; //usec 단위
+ 284   3            //        8MHz = 125ns        usec단위로 맞추기 위함
+ 285   3      
+ 286   3            carrier_time_ns =  ((125 * F4_carrier)  % 1000)/100; //100nsec 단위
+ 287   3      
+ 288   3            Envelop_time_max = (carrier_time_us*wTimer_Max);
+ 289   3            Envelop_counter_max = 65536 - (Envelop_time_max / 2) - ((carrier_time_ns * (wTimer_Max/10))/2); //Timin
+             -g 계산으로 인해 발생한 nsec 단위 손실에 대한 보상 값
+ 290   3      
+ 291   3            wTimer_Max = (0xFFFF / carrier_time_us) - 2;
+ 292   3      
+ 293   3            CRTDATA0 = 255 - F4_carrier/3;
+ 294   3            CRTDATA1 = 255 - (F4_carrier-F4_carrier/3);
+ 295   3          }
+ 296   2      #endif
+ 297   2          if( Before_CRT_State == RUN)
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 6   
+
+ 298   2            CRT_Run;
+ 299   2          else
+ 300   2            CRT_Stop;
+ 301   2          
+ 302   2          
+ 303   2          if(wTimer & 0x8000)
+ 304   2            Before_CRT_State = RUN;
+ 305   2          else 
+ 306   2            Before_CRT_State = STOP;
+ 307   2      
+ 308   2          if( (wTimer&0x7FFF) > wTimer_Max) // Envelop_time 계산 결과가 16bit를 초과하였을 경우
+ 309   2          {
+ 310   3            Envelop_time = Envelop_time_max; 
+ 311   3            Envelop_counter = Envelop_counter_max; 
+ 312   3            wTimer -= wTimer_Max;
+ 313   3            if(ramFormat.strMember.outorder[0] == 0xf4)
+ 314   3              f4_cnt--;
+ 315   3          }
+ 316   2          else
+ 317   2          {
+ 318   3            Envelop_time = (carrier_time_us*(wTimer&0x7FFF)); 
+ 319   3            Envelop_counter = 65536 - (Envelop_time / 2) - ((carrier_time_ns * (wTimer&0x7FFF)/10)/2); //Timing 계
+             -산으로 인해 발생한 nsec 단위 손실에 대한 보상 값
+ 320   3            uptr_Timer++;                     //next high pointer
+ 321   3            wTimer = *uptr_Timer;
+ 322   3          }
+ 323   2      
+ 324   2          RCAP2H = (Envelop_counter >> 8);
+ 325   2          RCAP2L = Envelop_counter & 0x00FF;
+ 326   2        }
+ 327   1      
+ 328   1        // output 1'st frame
+ 329   1        if(uptr_Timer > uptr_TimerEnd)
+ 330   1        {
+ 331   2          t1_int = 2;
+ 332   2          keyholdcnt++;
+ 333   2      
+ 334   2          if(keyholdcnt > 0xfe) keyholdcnt = 4;
+ 335   2      
+ 336   2          uptr_Timer    = Repeat_Start;
+ 337   2          uptr_TimerEnd = Repeat_End;
+ 338   2      
+ 339   2          wTimer = *uptr_Timer;
+ 340   2      
+ 341   2      #if (USE_SPECIAL_0F4H == TRUE)
+ 342   2          f4_cnt = 0;
+ 343   2      #endif
+ 344   2        }
+ 345   1        
+ 346   1        if(!wTimer)
+ 347   1        {
+ 348   2          t1_int = 2;
+ 349   2          pulse_stop();
+ 350   2        }
+ 351   1      
+ 352   1        TF2 = 0;  
+ 353   1      }
+ 354          
+ 355          void SPI_Interrupt(void) interrupt 6
+ 356          {
+ 357   1      }
+ 358          
+C51 COMPILER V9.60.0.0   MAIN                                                              12/02/2021 14:01:36 PAGE 7   
+
+ 359          void I2C_Interrupt(void) interrupt 7
+ 360          {
+ 361   1      }
+ 362          
+ 363          void LVD_Interrupt(void) interrupt 9
+ 364          {
+ 365   1      }
+ 366          
+ 367          void Comp_Out_RE_Interrupt(void) interrupt 11
+ 368          {
+ 369   1      }
+ 370          
+ 371          void Comp_Out_FE_Interrupt(void) interrupt 12
+ 372          {
+ 373   1      }
+ 374          
+ 375          
+ 376          /**
+ 377            * @brief  CRT demodulation interruption function ,sample carrier wave
+ 378            * @note   it will sample six value,and useless of the first one
+ 379            * @retval None
+ 380            */
+ 381          void CRT_Interrupt(void) interrupt 14 
+ 382          {
+ 383   1      }
+ 384          
+ 385          
+ 386          void External_Interrupt_2() interrupt 15
+ 387          {
+ 388   1      }
+ 389          
+ 390          void External_Interrupt_3() interrupt 16
+ 391          {
+ 392   1      }
+ 393          
+ 394          void KBI_Interrupt(void) interrupt 20 
+ 395          {
+ 396   1      }
+ 397          
+ 398          
+ 399          #endif  //__MAIN_C__
+ 400          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1668    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

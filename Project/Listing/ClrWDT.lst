@@ -1,0 +1,60 @@
+C51 COMPILER V9.00   CLRWDT                                                                12/10/2015 09:06:55 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE CLRWDT
+OBJECT MODULE PLACED IN .\Objects\ClrWDT.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\user_lib\ClrWDT.c BROWSE INCDIR(.\inc;.\src;.\inc\user_lib;.\src\user_l
+                    -ib) DEBUG OBJECTEXTEND PRINT(.\Listings\ClrWDT.lst) OBJECT(.\Objects\ClrWDT.obj)
+
+line level    source
+
+   1          /**
+   2          ********************************************************************************
+   3          * @file      ClrWDT.c
+   4          * @author    xiaodezhou 
+   5          * @version   V1.0.0
+   6          * @date      12/03/2015
+   7          * @breif     清看门狗
+   8          ********************************************************************************
+   9          * History:
+  10          * 12/03/2015 V1.0.0
+  11          ********************************************************************************
+  12          * THE PRESENT SOFTWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+  13          * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
+  14          * AS A RESULT, SLMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
+  15          * INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
+  16          * CONTENT OF SUCH SOFTWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
+  17          * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+  18          *
+  19          * THIS SOURCE CODE IS PROTECTED BY A LICENSE.
+  20          * FOR MORE INFORMATION PLEASE CAREFULLY READ THE LICENSE AGREEMENT FILE LOCATED
+  21          * IN THE ROOT DIRECTORY OF THIS FIRMWARE PACKAGE.
+  22          * <h2><center>&copy; COPYRIGHT 2015 Silan Microelectronics </center></h2>
+  23          ********************************************************************************
+  24          */
+  25          #include "SC51F33XX.h"
+  26          
+  27          /**
+  28           * Function: 调用该函数清看门狗
+  29          */
+  30          void ClrWDT()
+  31          {
+  32   1              WDTCLR0=0x00;    
+  33   1              WDTCLR1=0x00;    
+  34   1              WDTCLR0=0x53;   
+  35   1              WDTCLR1=0xAC;
+  36   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     12    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

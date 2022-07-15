@@ -1,0 +1,147 @@
+C51 COMPILER V9.00   PIT                                                                   04/19/2017 13:53:12 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE PIT
+OBJECT MODULE PLACED IN .\Output\pit.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\Libraries\sc51f3364_Periph_Driver\src\pit.c BROWSE INCDIR(..\..\..
+                    -\Libraries\sc51f3364_Periph_Driver\inc;..\..\..\Libraries\sc51f3364_Periph_Driver\src;.\user\inc;.\user\src;..\IR_Sample
+                    -) DEBUG OBJECTEXTEND PRINT(.\Listing\pit.lst) OBJECT(.\Output\pit.obj)
+
+line level    source
+
+   1          /**
+   2            ******************************************************************************
+   3            * @file      pit.c
+   4            * @author    MCU Application Team 
+   5            * @version   V1.0.0
+   6            * @date      8-Mar-2017
+   7            * @brief     C source file of pit 
+   8            *            History:
+   9            *
+  10            ******************************************************************************
+  11            * @attention
+  12            *
+  13            * <h2><center>&copy; COPYRIGHT 2016 Silan Microelectronics </center></h2>
+  14            *
+  15            * THE PRESENT SOFTWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+  16            * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
+  17            * AS A RESULT, SLMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
+  18            * INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
+  19            * CONTENT OF SUCH SOFTWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
+  20            * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+  21            *
+  22            * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  23            * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  24            * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  25            * DISCLAIMED.
+  26            * 
+  27            ******************************************************************************
+  28            */
+  29          #include "SC51F33XX.h"
+  30          #include "sc51f33xx_sys.h"
+  31          #include "sc51f33xx_hal_conf.h"
+  32          #include "pit.h"
+  33          
+  34          U16 T0_MS_COUNT_VALUE,T1_MS_COUNT_VALUE;
+  35          /** @addtogroup timers init function
+  36            * @{
+  37            * @note       the counter count-up from the value which be composed of TH1 and TL1 to     *
+  38            *                 0x1FFF when it works in mode 0,                                             *
+  39            *             0xFFFF when it works in mode 1,                                             *
+  40            *                     0xFF   when it works in mode 2,                                             *
+  41            */
+  42          void Timer_Init(U8 Tn_o,U8 Moden_o)
+  43          {
+  44   1          switch(Tn_o)
+  45   1          {
+  46   2              case T0:
+  47   2                  /*select clock source ,FCLK/2 here->{-,TIMPRS1[2:0],-,TIMPRS0[2:0]}*/
+  48   2                  xTIMPRS =0x00;
+  49   2                  /*to config TMOD register0 for timer 0 to select the working mode*/
+  50   2                  switch(Moden_o)
+  51   2                  {
+  52   3                      case MODE0:
+  53   3                          TMOD = 0x00;/*work in mode 0,13bit count*/
+C51 COMPILER V9.00   PIT                                                                   04/19/2017 13:53:12 PAGE 2   
+
+  54   3                          T0_MS_COUNT(0);
+  55   3                          break;
+  56   3                      case MODE1:
+  57   3                          TMOD = 0x01;/*work in mode 1,16bit count*/
+  58   3                          T0_MS_COUNT(1);
+  59   3                          break;
+  60   3                      case MODE2:
+  61   3                          TMOD = 0x02;/*work in mode 2,8bit count and automatically load when count overflow*/
+  62   3                          T0_MS_COUNT(2);
+  63   3                          break;
+  64   3                      case MODE3:
+  65   3                          TMOD = 0x03;/*work in mode 3,two 8bit counter*/
+  66   3                          T0_MS_COUNT(3);
+  67   3                      default:
+  68   3                          break;
+  69   3                  }
+  70   2                  TR0 = 0;
+  71   2                  START_VALUE_TN_MODEN(T0,MODE1);
+  72   2                  ET0 = 1;
+  73   2                  TR0 = 1;
+  74   2                  break;
+  75   2              case T1:
+  76   2                  /*select clock source ,FCLK/2 here->{-,TIMPRS1[2:0],-,TIMPRS0[2:0]}*/
+  77   2                  xTIMPRS =0x00;
+  78   2                  /*to config TMOD register0 for timer 1 to select the working mode*/
+  79   2                  switch(Moden_o)
+  80   2                  {
+  81   3                      case MODE0:
+  82   3                          TMOD = 0x00;/*work in mode 0,13bit count*/
+  83   3                          T0_MS_COUNT(0);
+  84   3                          break;
+  85   3                      case MODE1:
+  86   3                          TMOD = 0x10;/*work in mode 1,16bit count*/
+  87   3                          T0_MS_COUNT(1);
+  88   3                          break;
+  89   3                      case MODE2:
+  90   3                          TMOD = 0x20;/*work in mode 2,8bit count and automatically load when count overflow*/
+  91   3                          T0_MS_COUNT(2);
+  92   3                      default:
+  93   3                          break;
+  94   3                  }
+  95   2                  TR1 = 0;
+  96   2                  START_VALUE_TN_MODEN(T1,MODE1);
+  97   2                  ET1 = 1;
+  98   2                  TR1 = 1;
+  99   2                  break;
+ 100   2              case T2:
+ 101   2                  /*config T2 as timer mode and utomatically load mode when count overflow*/
+ 102   2                  T2CON1 &= 0xfc;
+ 103   2                  /*select clock source ,FCLK/2 here->{-,-,-,T2EXIN,RCPEN,T2CK[2:0]}*/
+ 104   2                  xT2CON2 = 0x00;
+ 105   2                  TR2 = 0;//T2CON1 &= 0xfb;/*close T2 before reload TH2 and TL2*/
+ 106   2                  START_VALUE_TN_MODEN(T2,MODE1);
+ 107   2                  ET2 = 1;
+ 108   2                  TR2 = 1;//T2CON1 |= 0x04;/*enable T2*/
+ 109   2              default:
+ 110   2                  break;
+ 111   2          }
+ 112   1          EA = 1;
+ 113   1      }
+ 114          /** 
+ 115            * @}
+C51 COMPILER V9.00   PIT                                                                   04/19/2017 13:53:12 PAGE 3   
+
+ 116            */
+ 117          
+ 118          /******************** (C) COPYRIGHT Silan Microelectronics *****END OF FILE****/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    180    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,233 @@
+C51 COMPILER V9.60.0.0   ROM                                                               12/02/2021 14:01:37 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE ROM
+OBJECT MODULE PLACED IN .\Output\rom.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\rom.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\List
+                    -ing\rom.lst) TABS(2) OBJECT(.\Output\rom.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __ROM_C__
+   3          #define __ROM_C__
+   4          
+   5          /**************************************************************************************************
+   6           *                                            INCLUDES
+   7           **************************************************************************************************/
+   8          #include "main.h"
+   9          #include "define.h"
+  10          #include "type_def.h"
+  11          #include "function_key.h"
+  12          #include "common.h"
+  13          #include "special.h"
+  14          
+  15          /*****************************************************************************/
+  16          /* Function implementation - global ('extern') and local ('static')          */
+  17          /*****************************************************************************/
+  18          
+  19          code const unsigned char X_CODECVT[] = {
+  20            KEY_ALLPOWER,   //01
+  21            KEY_TVPOWER,    //02
+  22            KEY_STBPOWER,     //03
+  23            KEY_MOVIE,        //04
+  24            KEY_REVIEW,     //05
+  25            KEY_OPTION,     //06
+  26            KEY_MENU,     //07
+  27            KEY_CHGUIDE,    //08
+  28            KEY_VOLUP,      //09
+  29            KEY_NAVI_UP,    //10
+  30            KEY_CHUP,     //11
+  31            KEY_NAVI_LEFT,    //12
+  32            KEY_OK,       //13
+  33            KEY_NAVI_RIGHT,   //14
+  34            KEY_VOLDOWN,    //15
+  35            KEY_NAVI_DOWN,    //16
+  36            KEY_CHDOWN,     //17
+  37            KEY_BACK,     //18
+  38            KEY_MUTE,     //19
+  39            KEY_EXIT,     //20
+  40            KEY_REW,      //21
+  41            KEY_PLAYPAUSE,    //22
+  42            KEY_STOP,     //23
+  43            KEY_FF,       //24
+  44            KEY_1,        //25
+  45            KEY_2,        //26
+  46            KEY_3,        //27
+  47            KEY_4,        //28
+  48            KEY_5,        //29
+  49            KEY_6,        //30
+  50            KEY_7,        //31
+  51            KEY_8,        //32
+  52            KEY_9,        //33
+  53            KEY_STAR,     //34
+  54            KEY_0,        //35
+C51 COMPILER V9.60.0.0   ROM                                                               12/02/2021 14:01:37 PAGE 2   
+
+  55            KEY_SHARP,      //36
+  56            KEY_SEARCH,     //37
+  57            KEY_DELETE,     //38
+  58            KEY_HANENG,     //39
+  59            KEY_RED,      //40
+  60            KEY_GREEN,      //41
+  61            KEY_YELLOW,     //42
+  62            KEY_BLUE,     //43
+  63            KEY_MYMENU,     //44
+  64            KEY_SHOPPING,   //45
+  65            KEY_WIDGET,     //46
+  66            KEY_APPSTORE,     //47
+  67            KEY_INPUT,      //48
+  68            KEY_TVVOLUP,      //49
+  69            KEY_TVVOLDOWN     //50
+  70          
+  71          };
+  72          
+  73          //;---------------------------------------;
+  74          //;           TABLE                       ;
+  75          //;---------------------------------------;
+  76          
+  77          code const unsigned char X_DATADUMMY[]={
+  78            0xed,   //DEV_STB
+  79            0xed,   //DEV_TV
+  80            0xed,   //DEV_TV1
+  81            0xed,   //DEV_TESTMODE
+  82          };
+  83          
+  84          code const unsigned char X_MAPDUMMY[]={
+  85            90
+  86          };
+  87          
+  88          code const unsigned char X_TOGGKEY[]={
+  89            KEY_TVPOWER
+  90          };
+  91          
+  92          
+  93          code const unsigned char X_TOGGPOS[]={
+  94            0,      //DEV_STB
+  95            1,      //DEV_TV
+  96            1,      //DEV_TV1
+  97            0,      //DEV_TESTMODE
+  98          };
+  99          
+ 100          code const func_ptr pfunc_ptr[]={
+ 101          //func_ptr xdata pfunc_ptr[]={
+ 102                &Key_NULL,
+ 103          
+ 104                &Key_TVPOWER,
+ 105                &Key_TVVOLUP,
+ 106                &Key_TVVOLDOWN,
+ 107                &Key_INPUT,
+ 108                &Key_ALLPOWER,
+ 109                &Key_STBPOWER,
+ 110                &Key_VOLUP,
+ 111                &Key_VOLDOWN,
+ 112                &Key_MUTE,
+ 113                &Key_CHUP,
+ 114                &Key_CHDOWN,
+ 115                &Key_NAVI_UP,
+ 116                &Key_NAVI_DOWN,
+C51 COMPILER V9.60.0.0   ROM                                                               12/02/2021 14:01:37 PAGE 3   
+
+ 117                &Key_NAVI_LEFT,
+ 118                &Key_NAVI_RIGHT,
+ 119                &Key_OK,
+ 120                &Key_1,
+ 121                &Key_2,
+ 122                &Key_3,
+ 123                &Key_4,
+ 124                &Key_5,
+ 125                &Key_6,
+ 126                &Key_7,
+ 127                &Key_8,
+ 128                &Key_9,
+ 129                &Key_0,
+ 130                &Key_MOVIE,
+ 131                &Key_REVIEW,
+ 132                &Key_CHGUIDE,
+ 133                &Key_MENU,
+ 134                &Key_OPTION,
+ 135                &Key_BACK,
+ 136                &Key_EXIT,
+ 137                &Key_REW,
+ 138                &Key_PLAYPAUSE,
+ 139                &Key_STOP,
+ 140                &Key_FF,
+ 141                &Key_STAR,
+ 142                &Key_SHARP,
+ 143                &Key_SEARCH,
+ 144                &Key_DELETE,
+ 145                &Key_HANENG,
+ 146                &Key_RED,
+ 147                &Key_GREEN,
+ 148                &Key_YELLOW,
+ 149                &Key_BLUE,
+ 150                &Key_MYMENU,
+ 151                &Key_SHOPPING,
+ 152                &Key_WIDGET,
+ 153                &Key_APPSTORE  
+ 154          };
+ 155          
+ 156          
+ 157          code const  func_special pfunc_special[]={
+ 158            &func_SPECIAL_F0,
+ 159            &func_SPECIAL_F1,
+ 160            &func_SPECIAL_F2,
+ 161            &func_SPECIAL_F3,
+ 162            &func_SPECIAL_F4,
+ 163            &func_SPECIAL_F5,
+ 164            &func_SPECIAL_F6,
+ 165            &func_SPECIAL_F7,
+ 166            &func_SPECIAL_F8,
+ 167            &func_SPECIAL_F9,
+ 168            &func_SPECIAL_FA,
+ 169            &func_SPECIAL_FB,
+ 170            &func_SPECIAL_FC,
+ 171            &func_SPECIAL_FD,
+ 172            &func_SPECIAL_FE                    
+ 173          };
+ 174          
+ 175          code const int8u  constBitMask[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+ 176          code const int8u  pbMaskIndex[] = {0x01,0x03,0x7,0x0f,0x1f,0x3f};
+ 177          
+ 178          code const unsigned short  RC6[]={
+C51 COMPILER V9.60.0.0   ROM                                                               12/02/2021 14:01:37 PAGE 4   
+
+ 179          //unsigned short xdata RC6[]={
+ 180            2666,     //high  2.666ms   0
+ 181            889,      //low   889us   1
+ 182            444,      //high  444us   2
+ 183            889,      //low 889us   3
+ 184            444,      //high  444us   4
+ 185            444,      //low 444us   5
+ 186            444,      //high  444us   6
+ 187            444       //low 444us   7
+ 188            };
+ 189          
+ 190          code const unsigned char FACTORY_TEST_KEY[5]={
+ 191            KEY_SEARCH,
+ 192            KEY_HANENG,
+ 193            KEY_DELETE,
+ 194            KEY_DELETE,
+ 195            KEY_APPSTORE
+ 196          };
+ 197          
+ 198          code const unsigned char SW_VERSION[]={
+ 199            APP_FW_VERSION | 0x80         //Software Revision Number
+ 200          };
+ 201          
+ 202          #endif  //__ROM_C__
+ 203          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =    294    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

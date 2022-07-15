@@ -1,0 +1,221 @@
+C51 COMPILER V9.60.0.0   RAM                                                               12/02/2021 14:01:36 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE RAM
+OBJECT MODULE PLACED IN .\Output\ram.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\ram.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\List
+                    -ing\ram.lst) TABS(2) OBJECT(.\Output\ram.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __RAM_C__
+   3          #define __RAM_C__
+   4          
+   5          /**************************************************************************************************
+   6           *                                            INCLUDES
+   7           **************************************************************************************************/
+   8          #include "define.h"
+   9          #include "type_def.h"
+  10          #include "main.h"
+  11          
+  12          /*****************************************************************************/
+  13          /* Global variable declarations ('', definition in C source)           */
+  14          /*****************************************************************************/
+  15          xdata   TYPE_SETNO    set_no;
+  16          xdata   TYPE_FORMAT   ramFormat;
+  17          xdata   TYPE_CODE   ramCode;
+  18          xdata   IR_STREAM_ST  ir_stream;
+  19          //xdata   Input_Carrier Envelop;
+  20          xdata   IR_ZIP_ST     ir_zip;
+  21          
+  22          xdata   byte    chksum;
+  23          xdata   byte    curr_device;
+  24          xdata   byte    curr_source;
+  25          xdata   byte    backup_source;
+  26          xdata   byte    curr_state;
+  27          xdata   byte    setting_device;
+  28          xdata   byte    setting_source;
+  29          xdata   byte    backup_key;
+  30          xdata   byte    key_buf[KEY_BUFF_CNT];
+  31          xdata   byte    key_cnt;
+  32          xdata   byte    key_buf_old[KEY_BUFF_CNT];
+  33          xdata   byte    key_changed;
+  34          xdata   byte    IrKeyBuf;
+  35          xdata   byte    backup_IrKeyBuf;
+  36          //xdata   byte    gl_Toggle2;
+  37          xdata   byte    gl_Toggle[SRC_CNT];
+  38          xdata   byte    keyholdcnt;
+  39          xdata   byte    power_toggle;
+  40          xdata   set_number_t    setting_no;
+  41          xdata   byte    reg_key_max;
+  42          xdata   byte    reg_key_buf[KEY_BUFF_CNT];
+  43          xdata   byte    t1_int;
+  44          xdata   WORD    wTimer;
+  45          xdata   WORD    Timer0_65ms16;
+  46          xdata   WORD    Timer0_65ms16_2;
+  47          xdata   WORD    Timer0_keyin_chk;
+  48          #if (USE_AVSHIFT_MODE == TRUE)
+  49          xdata   WORD    Timer0_avShiftMode;
+  50          #endif
+  51          xdata   byte    Timer1_1sec08;
+  52          xdata   byte    ir_ok;
+  53          xdata   byte    setting_ok;
+  54          xdata   WORD*   uptr_Timer;                 // move to absolute address
+C51 COMPILER V9.60.0.0   RAM                                                               12/02/2021 14:01:36 PAGE 2   
+
+  55          xdata   WORD*   uptr_TimerEnd;
+  56          
+  57          #if (USE_IR_LEARN == TRUE)
+              xdata   WORD    nPosNib;                   // Pattern을 가리키는 index(Nibble단위)
+              xdata   WORD    nWidBit;                   // 현재의 Data크기.
+              xdata   WORD    PulseCnt;
+              xdata   WORD    nPosBit;                   // Data을 가리키는 index(bit단위)
+              xdata   WORD    wCurVal;
+              xdata   WORD    nPatCnt;                   // Pattern의 크기.
+              xdata   byte    g_temp;
+              xdata   byte    bNibble;
+              xdata   byte    return_int8u;
+              xdata   WORD    return_int16u;
+              xdata   byte    LearnKeyNo;
+              #endif
+  70          
+  71          xdata   set_number_t    refNo_inAuto;
+  72          xdata   byte    refDev_inAuto;
+  73          xdata   byte    direction_inAuto;
+  74          xdata   byte    end1;
+  75          xdata   byte    end2;
+  76          xdata   byte    repeat;
+  77          xdata   byte*   pStream;
+  78          xdata   byte    prev_direction;
+  79          xdata   set_number_t    backup_settingNo;
+  80          xdata   byte    direction_G;
+  81          xdata   byte    learn_type;
+  82          xdata   byte    RW;
+  83          xdata   byte    led_force;
+  84          #if (USE_SPECIAL_0FEH_5 == TRUE)
+  85          xdata   byte    Three_low_keyoff;
+  86          #endif
+  87          //xdata   byte    TV2_SetState;             // 3-digit 또는 auto-search 중 set_no.set_member.TV2_SetState 값이
+             - 
+  88                                                    // 변경될 수 있다. 만약, 저장하지 않고 종료할 경우 설정모드 �
+             -�입시의
+  89                                                    // set_no.set_member.TV2_SetState 값으로 돌려놓기 위해서 사용함.
+  90          #if (USE_BATT_MONITOR == TRUE)
+  91          xdata   byte    keyCnt_inLow;
+  92          xdata   byte    lvi_check_key;
+  93          #endif
+  94          xdata   byte    twokey_result;
+  95          
+  96          xdata   byte    FactoryEntryCnt;
+  97          xdata   byte    bTestModeEnable;
+  98          xdata   byte    ContinueDoubleKey;
+  99          #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 100          xdata   byte    StbNo_AutoSearch;
+ 101          #endif
+ 102          #if (USE_AVSHIFT_MODE == TRUE)
+ 103          xdata   byte    avShiftMode_active;
+ 104          #endif
+ 105          #if (USE_BATCH_SS_LG == TRUE)
+ 106          xdata   byte    batch_mode_keybuf;
+ 107          xdata   set_number_t    batch_mode_setting_no;
+ 108          #endif
+ 109          
+ 110          /////////////////////////////////////////////////////////////////////////////////////
+ 111          xdata byte  RC5_Toggle;
+ 112          xdata byte  outframeNo;
+ 113          /////////////////////////////////////////////////////////////////////////////////////
+ 114          
+C51 COMPILER V9.60.0.0   RAM                                                               12/02/2021 14:01:36 PAGE 3   
+
+ 115          
+ 116          idata     TYPE_CODE_SPECIALF4F8*  pramCode;
+ 117          
+ 118          #if (USE_ADDRESS_32BIT == TRUE)
+              idata   ULONG*  pWordptr;
+              idata   ULONG*  cpX_keymap;
+              #else
+ 122          idata WORD*     pWordptr;
+ 123          idata WORD*     cpX_keymap;
+ 124          #endif
+ 125          
+ 126          idata   WORD*   bidxEndWord1;
+ 127          idata   WORD*   bidxEndWord2;
+ 128          idata   WORD*   bidxRepeatWord;
+ 129          //idata   ULONG*    pulPtr;
+ 130          idata   byte*   pTemp;
+ 131          idata   byte*   pCodeLast;
+ 132          idata   byte*   cpX_keymap2;
+ 133          idata   byte*   pCodeaddr_1;
+ 134          idata   WORD*   npWaddr_1;
+ 135          //idata   WORD*     First_Start;
+ 136          idata   WORD*     First_End;
+ 137          idata   WORD*     Repeat_Start;
+ 138          idata   WORD*     Repeat_End;
+ 139          idata   WORD    pflashCode;
+ 140          //idata   byte*     pExtRam;
+ 141          //idata   WORD    temp;
+ 142          idata   WORD    TransferSize;
+ 143          //idata   byte    bodIntFlag;
+ 144          idata   byte    f4_cnt;
+ 145          //idata   byte    bSingleIndex;     //DATA 영역에서 단펄스 인덱스
+ 146          
+ 147          #if (USE_IR_LEARN == TRUE)
+              idata   WORD*     ppdata;
+              idata   WORD*   pStream16u;
+              idata   byte    CarrierIdx;
+              idata   byte    Ready_Low_Capture;
+              idata   byte    NoSinalCnt;
+              idata   WORD    ipc_cnt;
+              idata   byte    bT3OverFlow;      // Timer 3 over flow flag
+              idata   int32u    CntFor2Sec;
+              idata   int32u    wDutyCycle;
+              #endif
+ 158          
+ 159          //------------------------------------------------------------------------
+ 160          idata   WORD    eeFAILAddress;
+ 161          idata   byte    eeFAIL;
+ 162          idata   byte    eeIntFlag;
+ 163          
+ 164          xdata   int16u    crt_int_counter;
+ 165          xdata   WORD    Envelop_time;
+ 166          xdata   WORD    Envelop_counter;
+ 167          xdata   WORD    Envelop_time_max;
+ 168          xdata   WORD    Envelop_counter_max;
+ 169          xdata   WORD    carrier_time;
+ 170          xdata   WORD    carrier_time_us;
+ 171          xdata   WORD    carrier_time_ns;
+ 172          xdata   BYTE    Envelop_create_flag;
+ 173          xdata   WORD    wTimer_Max;
+ 174          xdata     BYTE    Before_CRT_State;
+ 175          xdata   BYTE    reload_time;
+ 176          xdata   BYTE    before_reload_state;
+C51 COMPILER V9.60.0.0   RAM                                                               12/02/2021 14:01:36 PAGE 4   
+
+ 177          xdata   BYTE    Before_carrier;
+ 178          xdata   BYTE    non_special_flash_start;
+ 179          xdata   BYTE    F4_i;
+ 180          xdata   BYTE    F4_carrier;
+ 181          xdata   BYTE    continuous_reload;
+ 182          
+ 183          
+ 184          
+ 185          
+ 186          
+ 187          
+ 188          #endif  //__RAM_C__
+ 189          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    767    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =     51    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

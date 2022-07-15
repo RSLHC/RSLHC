@@ -1,0 +1,2340 @@
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE COMMON
+OBJECT MODULE PLACED IN .\Output\common.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\common.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\L
+                    -isting\common.lst) TABS(2) OBJECT(.\Output\common.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __COMMON_C__
+   3          #define __COMMON_C__
+   4          
+   5          /**************************************************************************************************
+   6           *                                            INCLUDES
+   7           **************************************************************************************************/
+   8          #include  "main.h"
+   9          #include  "common.h"
+  10          #include  "function_key.h"
+  11          #include  "hal.h"
+  12          #include  "flash.h"
+  13          #include  "crt.h"
+  14          //#include  "Eeprom.h"
+  15          
+  16          #if (USE_IR_LEARN == TRUE)
+              #include  "learn.h"
+              #endif
+  19          
+  20          /**************************************************************************************************
+  21           *                                        FUNCTIONS - API
+  22           **************************************************************************************************/
+  23          set_number_t LoadSetNumber(BYTE *p)
+  24          {
+  25   1        set_number_t value;
+  26   1      
+  27   1      #if (USE_2BYTE_SETTING_NO == TRUE)
+  28   1        //value = *p;
+  29   1        //value |= *(p+1)<<8;
+  30   1        value = *p<<8;
+  31   1        value |= *(p+1);
+  32   1      #else
+                value = *p;
+              #endif
+  35   1        return value;
+  36   1      }
+  37          
+  38          int8u Panasonic_TV_Check(int8u device, set_number_t set_no)
+  39          {
+  40   1        int8u   rtrn = FALSE;
+  41   1      #if (USE_ADDRESS_32BIT == TRUE)
+                uint32* pAddr;
+              #else
+  44   1        WORD*   pAddr;
+  45   1      #endif
+  46   1        byte* pAddr2;
+  47   1        set_number_t  bLongFrameNo;
+  48   1      
+  49   1        if((IrKeyBuf != KEY_TVPOWER)
+  50   1          &&(IrKeyBuf != KEY_ALLPOWER)
+  51   1          )
+  52   1          return rtrn;
+  53   1      
+  54   1      #if (USE_ADDRESS_32BIT == TRUE)
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 2   
+
+                pAddr = (uint32 *)(X_LONGFRAME + device);
+              #else
+  57   1        pAddr = (WORD *)(X_LONGFRAME + device);
+  58   1      #endif
+  59   1      
+  60   1        pAddr2 = (byte code*) *pAddr;
+  61   1      
+  62   1        while(1)
+  63   1        {
+  64   2          bLongFrameNo = LoadSetNumber(pAddr2);
+  65   2          if(bLongFrameNo == 0)
+  66   2          {
+  67   3            rtrn = FALSE;
+  68   3            break;
+  69   3          }
+  70   2      
+  71   2          if(bLongFrameNo == set_no) 
+  72   2          {
+  73   3            rtrn = TRUE;
+  74   3            break;
+  75   3          }
+  76   2      
+  77   2          pAddr2 += INC_PTR_SIZE;
+  78   2        }
+  79   1        return rtrn;
+  80   1      }
+  81          
+  82          void SetMode_StartTimeOut(int16u time)
+  83          {
+  84   1        Timer0_65ms16_2 = time;
+  85   1        Timer0_65msStart();
+  86   1      }
+  87          
+  88          #if (USE_AVSHIFT_MODE == TRUE)
+  89          void Timer0_avShiftMode_Update(int16u time)
+  90          {
+  91   1        Timer0_avShiftMode = time;
+  92   1      }
+  93          
+  94          void avShiftMode_StartTimeOut(int16u time)
+  95          {
+  96   1        Timer0_avShiftMode = time;
+  97   1        Timer0_65msStart();
+  98   1      }
+  99          #endif
+ 100          
+ 101          #if (USE_IR_LEARN == TRUE)
+              void IrZipData_Clear(void)
+              {
+                BYTE  i;
+              
+                for(i=0; i<FULL_IRZIP_BUFFER_SIZE; i++)
+                {
+                  ir_zip.Tunion.data1[i] = 0;
+                }
+              }
+              #endif
+ 112          
+ 113          void wBitStream_Clear(void)
+ 114          {
+ 115   1        int8u* bit_Clear;
+ 116   1      
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 3   
+
+ 117   1        bit_Clear = (int8u*)&ir_stream.Tunion.data1[0];
+ 118   1      
+ 119   1        for( ; bit_Clear <= (int8u*)&ir_stream.Tunion.Tstruct.pulse.BitStream[MAX_BITSTREAM]; bit_Clear++)
+ 120   1        {
+ 121   2          *bit_Clear = 0;
+ 122   2        }
+ 123   1      
+ 124   1      //  *(++bit_Clear) = 0;
+ 125   1      }
+ 126          
+ 127          void WDG_SystemReset(void)
+ 128          {
+ 129   1        ClrWDT();
+ 130   1      
+ 131   1        WDTCON = 0x07;  // Bit7~Bit3 : WDTRL[4:0]: 5-bit initial value for down counter with auto-load, the value
+             - is 1FH by default.
+ 132   1                // Bit1~Bit0 : WDTPR[1:0]: WDT clock prescale selection bit.
+ 133   1                //         00: RCL/16.
+ 134   1                //         01: RCL/32.
+ 135   1                //         10: RCL/64.
+ 136   1                //         11: RCL/128 (default).
+ 137   1                //         RCL(=20KHz) / 128(WDTPR[1:0]=11) => 44ms(Overflow time step)
+ 138   1      
+ 139   1        xSYSCFG  |= (1<<WDTCFG); //WDT is on in STOP mode.
+ 140   1        xSYSCFG  &= ~(1<<RCLCFG); // RCL is on.
+ 141   1        
+ 142   1        while(1){}
+ 143   1      }
+ 144          
+ 145          void SW_SystemReset(void)
+ 146          {
+ 147   1        RSTSRC |= (1<<SOFTF);   // SOFTF: software reset flag bit, set to 1 when MCU excute the reset instruction.
+ 148   1      }
+ 149          
+ 150          //----------------------------------------
+ 151          // Low Voltage Check
+ 152          //----------------------------------------
+ 153          #if (USE_BATT_MONITOR == TRUE)
+ 154          void Low_Voltage_Check(byte lvi_key)
+ 155          {
+ 156   1      //  byte  i;
+ 157   1      
+ 158   1        lvi_check_key = 0;
+ 159   1      
+ 160   1        switch(lvi_key)
+ 161   1        {
+ 162   2          case  KEY_ALLPOWER:
+ 163   2            lvi_check_key = 1;
+ 164   2            break;
+ 165   2          case  KEY_TVPOWER:
+ 166   2          case  KEY_TVVOLUP:
+ 167   2          case  KEY_TVVOLDOWN:
+ 168   2          case  KEY_INPUT:
+ 169   2            lvi_check_key = 0;
+ 170   2            break;
+ 171   2          default:
+ 172   2            lvi_check_key = 2;
+ 173   2            break;
+ 174   2        }
+ 175   1      
+ 176   1        if(LVDCON & (1<<LVDF))    // LVDF : low voltage detecting flag bit.
+ 177   1        {
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 4   
+
+ 178   2          keyCnt_inLow--;   //BOF flag detected !
+ 179   2        }
+ 180   1        else
+ 181   1        {
+ 182   2          keyCnt_inLow=LVI_CHECK_CNT;
+ 183   2        }
+ 184   1      
+ 185   1        if(keyCnt_inLow>LVI_CHECK_CNT)
+ 186   1          keyCnt_inLow=LVI_CHECK_CNT;
+ 187   1      }
+ 188          #endif
+ 189          
+ 190          void Delayby10us(int16u nCnt)
+ 191          {
+ 192   1        int16u  i = 0;
+ 193   1      
+ 194   1      /*  unsigned char xdata i,loopcount;
+ 195   1      
+ 196   1      #if (MAIN_OSC == OSC_4MHZ)
+ 197   1        loopcount =32; //40us / 1 intruction excute time = 0.5 us
+ 198   1      #elif (MAIN_OSC == OSC_8MHZ)
+ 199   1        loopcount =64; //40us / 1 intruction excute time = 0.25 us
+ 200   1      #elif (MAIN_OSC == OSC_10MHZ)
+ 201   1        loopcount =80; //40us / 1 intruction excute time = 0.2 us
+ 202   1      #elif (MAIN_OSC == OSC_12MHZ)
+ 203   1        loopcount =96; //40us / 1 intruction excute time = 0.166 us
+ 204   1      #endif
+ 205   1      */
+ 206   1      //  loopcount--;
+ 207   1      //  for(i=0;i<loopcount;i++) { _nop_(); _nop_(); _nop_();_nop_();}
+ 208   1      
+ 209   1        for(i=0; i<nCnt; i++)
+ 210   1        {
+ 211   2          //wait_10us();    // warning 발생으로 주석 처리(8MHZ OSC에 대한 nop() 추가
+ 212   2          _nop_();
+ 213   2          _nop_();
+ 214   2          _nop_();
+ 215   2          _nop_();
+ 216   2          _nop_();
+ 217   2          _nop_();
+ 218   2          _nop_();
+ 219   2          _nop_();
+ 220   2          _nop_();
+ 221   2          _nop_();
+ 222   2          _nop_();
+ 223   2          _nop_();
+ 224   2          _nop_();
+ 225   2          _nop_();
+ 226   2          _nop_();
+ 227   2          _nop_();
+ 228   2          _nop_();
+ 229   2          _nop_();
+ 230   2          _nop_();
+ 231   2          _nop_();
+ 232   2          _nop_();
+ 233   2          _nop_();
+ 234   2          _nop_();
+ 235   2          _nop_();
+ 236   2          _nop_();
+ 237   2          _nop_();
+ 238   2          _nop_();
+ 239   2          _nop_();
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 5   
+
+ 240   2          _nop_();
+ 241   2          _nop_();
+ 242   2          _nop_();
+ 243   2          _nop_();
+ 244   2          _nop_();
+ 245   2          _nop_();
+ 246   2          _nop_();
+ 247   2          _nop_();
+ 248   2          _nop_();
+ 249   2          _nop_();
+ 250   2          _nop_();
+ 251   2          _nop_();
+ 252   2      #if(MAIN_OSC == OSC_16MHZ)
+ 253   2          _nop_();
+ 254   2          _nop_();
+ 255   2          _nop_();
+ 256   2          _nop_();
+ 257   2          _nop_();
+ 258   2          _nop_();
+ 259   2          _nop_();
+ 260   2          _nop_();
+ 261   2          _nop_();
+ 262   2          _nop_();
+ 263   2          _nop_();
+ 264   2          _nop_();
+ 265   2          _nop_();
+ 266   2          _nop_();
+ 267   2          _nop_();
+ 268   2          _nop_();
+ 269   2          _nop_();
+ 270   2          _nop_();
+ 271   2          _nop_();
+ 272   2          _nop_();
+ 273   2          _nop_();
+ 274   2          _nop_();
+ 275   2          _nop_();
+ 276   2          _nop_();
+ 277   2          _nop_();
+ 278   2          _nop_();
+ 279   2          _nop_();
+ 280   2          _nop_();
+ 281   2          _nop_();
+ 282   2          _nop_();
+ 283   2          _nop_();
+ 284   2          _nop_();
+ 285   2          _nop_();
+ 286   2          _nop_();
+ 287   2          _nop_();
+ 288   2          _nop_();
+ 289   2          _nop_();
+ 290   2          _nop_();
+ 291   2          _nop_();
+ 292   2          _nop_();
+ 293   2      #endif
+ 294   2        }
+ 295   1      }
+ 296          
+ 297          //----------------------------------------
+ 298          // INPUT: key_buf[0]
+ 299          // OUTPUT: key_cnt=key press no(갯수)
+ 300          //         keybuf=key index no.
+ 301          //----------------------------------------
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 6   
+
+ 302          void getkey(unsigned char* p)
+ 303          {
+ 304   1        BYTE  keysel;
+ 305   1        BYTE  i, j, keydata;
+ 306   1      
+ 307   1      //  KEYSCAN_Interrupt_di;
+ 308   1      
+ 309   1        for(i=0; i<KEY_BUFF_CNT; i++)
+ 310   1        {
+ 311   2          *(p+i) = NO_KEY;      //key_buf[4] 초기화
+ 312   2        }
+ 313   1      
+ 314   1        
+ 315   1        key_cnt = 0;
+ 316   1      
+ 317   1        // Outputs "H" level to GPIO. 
+ 318   1        P2 |= _0110_0111B;  // P2.0(OUT0), P2.1(OUT1), P2.2(OUT2), P2.5(OUT3), P2.6(OUT4) 
+ 319   1        P0 |= _1100_0000B;  // P0.6(OUT5), P0.7(OUT6)
+ 320   1      
+ 321   1        P2 &= _1111_1110B; //P2.0 부터 Search 시작
+ 322   1        keysel = P2;       //strobe
+ 323   1      
+ 324   1        for(i=0; i<KEY_OUTPUT_MAX_COUNT; i++)
+ 325   1        {
+ 326   2          /* minimum 40us needed for high recognition because input port pullup resistor needs 40us rising time */
+ 327   2          Delayby10us(4);       // Key stabilization time
+ 328   2      
+ 329   2          //keydata = (P0 & _1111_1111B);
+ 330   2          keydata = (P1 & _1111_1111B);
+ 331   2      
+ 332   2          for(j=0; j<KEY_INPUT_MAX_COUNT; j++)
+ 333   2          {
+ 334   3            if(key_cnt > KEY_BUFF_CNT) break;
+ 335   3            if(keydata == NO_KEY) break;
+ 336   3      
+ 337   3            if (((1 << j) & keydata) == 0)
+ 338   3            {
+ 339   4              p[key_cnt++] = j + (i * KEY_INPUT_MAX_COUNT) + 1;
+ 340   4            }
+ 341   3          }
+ 342   2      
+ 343   2          if(i < P2_N_BIT_MAX_COUNT) // P2.n에 대한 처리
+ 344   2          //if(i < 5) // P2.n에 대한 처리
+ 345   2          {
+ 346   3            keysel = _0110_0111B;
+ 347   3            if(i >= 2) // P2.5(OUT3), P2.6(OUT4)에 대한 처리
+ 348   3              keysel &= ~(1<<i+3);
+ 349   3            else
+ 350   3              keysel &= ~(1<<i+1);
+ 351   3      
+ 352   3            if(i == 4)
+ 353   3            {
+ 354   4              P2 = _0110_0111B;
+ 355   4              P0 &= _1011_1111B;
+ 356   4              keysel = P0;
+ 357   4            }
+ 358   3            else
+ 359   3              P2 = keysel & _0110_0111B;
+ 360   3          }
+ 361   2          else if (i == 5) // P0.n에 대한 처리
+ 362   2          {
+ 363   3            P0 |= (1<<6);
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 7   
+
+ 364   3            P0 &= _0111_1111B;
+ 365   3          } 
+ 366   2      
+ 367   2          else //i == 6
+ 368   2            P0 |= _1100_0000B;
+ 369   2        }
+ 370   1      
+ 371   1        /* Outputs "L" level to GPIO */
+ 372   1        P2 &= _1001_1000B;
+ 373   1        P0 &= _0011_1111B;
+ 374   1      
+ 375   1        codeCvt(p);
+ 376   1      }
+ 377          
+ 378          #if 0
+              void key_changed_check(void)
+              {
+                int8u   bi;
+              
+                key_changed = 0;
+                for(bi=0;bi<4;bi++)
+                {
+                  if(key_buf[bi]!=key_buf_old[bi])
+                    key_changed = 1;
+              
+                  key_buf_old[bi]=key_buf[bi];
+                }
+              }
+              #endif
+ 393          
+ 394          
+ 395          void key_buf_old_clear(void)
+ 396          {
+ 397   1        unsigned char i;
+ 398   1      
+ 399   1        for(i=0; i<4; i++) key_buf_old[i]=0;
+ 400   1      }
+ 401          
+ 402          unsigned char getkey_simple(void)
+ 403          {
+ 404   1        KBI_Interrupt_di;
+ 405   1      
+ 406   1        /* Outputs "L" level to GPIO. */
+ 407   1        P2 &= ~KEY_OUTPUT_PINS_P2;
+ 408   1        P0 &= ~KEY_OUTPUT_PINS_P0;
+ 409   1      
+ 410   1        // Key stabilization time
+ 411   1      
+ 412   1        Delayby10us(4);
+ 413   1      
+ 414   1        if(P1 == NO_KEY)  return FALSE;
+ 415   1        else        return TRUE;
+ 416   1      }
+ 417          
+ 418          
+ 419          //----------------------------------------;
+ 420          // wait for key off.
+ 421          //----------------------------------------
+ 422          void wait_getkey_simple(void)
+ 423          {
+ 424   1        while(getkey_simple()){}
+ 425   1        t0_wait(1);
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 8   
+
+ 426   1      }
+ 427          
+ 428          //----------------------------------------
+ 429          // holding key in after ir out.
+ 430          //----------------------------------------
+ 431          #if 0
+              void getkey_wait(void)
+              {
+                while(1)
+                {
+                  getkey(&key_buf[0]);
+                  if(key_cnt==0) break;
+                  if(key_cnt>=2) break;
+                  if(key_cnt==1) continue;
+                }
+              }
+              #endif
+ 443          
+ 444          //----------------------------------------
+ 445          // holding key in after ir out.
+ 446          //----------------------------------------
+ 447          #if 0
+              void get2key_wait(void)
+              {
+                while(1)
+                {
+                  getkey(&key_buf[0]);
+                  if(key_cnt == 2) continue;
+                  else  break;
+                }
+              }
+              #endif
+ 458          
+ 459          //----------------------------------------
+ 460          // INPUT: &key_buf[0]
+ 461          // OUTPUT: key_buf (key index)
+ 462          //                -> key_buf (define key no)
+ 463          //----------------------------------------
+ 464          
+ 465          void codeCvt(BYTE* pKey_buf)
+ 466          {
+ 467   1        byte  i[4], j;
+ 468   1        BYTE code* cpX_cvt;
+ 469   1      
+ 470   1        cpX_cvt=(BYTE code*)X_CODECVT;
+ 471   1      
+ 472   1        if(key_cnt > KEY_BUFF_CNT) key_cnt = KEY_BUFF_CNT;
+ 473   1      
+ 474   1        for(j=0; j<key_cnt; j++)            //initial, key_cnt는 max 4까지만 가능 함.
+ 475   1        {
+ 476   2          i[j] = *(pKey_buf+j);
+ 477   2          i[j] = i[j]-1;
+ 478   2        }
+ 479   1      
+ 480   1        for(j=0; j<key_cnt; j++)
+ 481   1        {
+ 482   2          pKey_buf[j] = *(cpX_cvt + i[j]);
+ 483   2        }
+ 484   1      }
+ 485          
+ 486          //----------------------------------------
+ 487          // map convert
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 9   
+
+ 488          //----------------------------------------
+ 489          int8u get_map_pointer(void)
+ 490          {
+ 491   1        //byte  i = key_buf[0] - 1;
+ 492   1        byte  i = IrKeyBuf - 1;
+ 493   1        byte  idxKey;
+ 494   1      
+ 495   1      #if (USE_ADDRESS_32BIT == TRUE)
+                cpX_keymap=(ULONG *)X_KEYMAP;
+              #else
+ 498   1        cpX_keymap = (WORD *)X_KEYMAP;
+ 499   1      #endif
+ 500   1      
+ 501   1        cpX_keymap = (cpX_keymap + curr_device);  //each device map pointer
+ 502   1      
+ 503   1        cpX_keymap2 = (BYTE code*) *cpX_keymap;
+ 504   1        idxKey = *(cpX_keymap2 + i);        //idxKey-> map value
+ 505   1      
+ 506   1        cpX_keymap2 = (BYTE *) X_MAPDUMMY;
+ 507   1        i = *cpX_keymap2;             //map dummy check.
+ 508   1      
+ 509   1        if(idxKey != i) return idxKey;
+ 510   1      
+ 511   1        return MAP_NG;
+ 512   1      }
+ 513          
+ 514          //----------------------------------------
+ 515          // call from main()
+ 516          //----------------------------------------
+ 517          void my_sub(void)
+ 518          {
+ 519   1        t1_int=1;
+ 520   1      
+ 521   1        //if(backup_key!=key_buf[0])
+ 522   1        if(backup_IrKeyBuf == 0xff)
+ 523   1        {
+ 524   2          my_newkeyincond();        //first key in
+ 525   2      
+ 526   2          wBitStream_Clear();
+ 527   2      
+ 528   2      #if (USE_STUCKKEY_TIMER == TRUE)
+ 529   2          StuckKeyTimer_Start(STUCKKEY_TIMEOUT_S);
+ 530   2      #endif
+ 531   2      
+ 532   2          if(Send_UR_Ready()==FALSE)
+ 533   2          {
+ 534   3            //backup_key=0xff;
+ 535   3            ir_ok=FALSE;
+ 536   3            outframeNo=0;
+ 537   3            backup_IrKeyBuf=0xff;
+ 538   3            return;
+ 539   3          }
+ 540   2      
+ 541   2          gl_Toggle[curr_source]++;
+ 542   2      
+ 543   2          ir_ok=TRUE;
+ 544   2      
+ 545   2      #if 1
+ 546   2      #if (USE_AVSHIFT_MODE == TRUE)
+ 547   2          if(!avShiftMode_active)
+ 548   2      #endif
+ 549   2          device_led_on(IR_SENDING_LED);
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 10  
+
+ 550   2      
+ 551   2      #else
+                  if( (curr_state==SET_MODE_DIGIT) || (curr_state==SET_MODE_AUTO) )
+                    device_led_on(setting_source);
+                  else
+                    device_led_on(curr_source);
+              #endif
+ 557   2      
+ 558   2          send_ur();
+ 559   2        }
+ 560   1      }
+ 561          
+ 562          // 새로운 키 입력
+ 563          void my_newkeyincond(void)
+ 564          {
+ 565   1        keyholdcnt=0;
+ 566   1        backup_key=key_buf[0];
+ 567   1        backup_IrKeyBuf = IrKeyBuf;
+ 568   1        //wBitStream_Clear();     // MULTIPLE CALL TO SEGMENT WARNING ????? ???
+ 569   1      }
+ 570          
+ 571          void Timer0_65ms16_2_Update(int16u time)
+ 572          {
+ 573   1        Timer0_65ms16_2 = time;
+ 574   1      }
+ 575          
+ 576          //----------------------------------------
+ 577          // t0 only wait
+ 578          // input: Timer0_65ms16 (1=65ms)
+ 579          // output: wiat..
+ 580          //----------------------------------------
+ 581          void t0_wait(int16u i)
+ 582          {
+ 583   1        if(i == 0)
+ 584   1          return;
+ 585   1      
+ 586   1        TickTimer_65msStart(i);
+ 587   1      
+ 588   1        while(Timer0_65ms16){}
+ 589   1      
+ 590   1        //아래 변수에 값이 있으면 65ms 타이머를 멈추지 않는다.(설정모드에서 사용)
+ 591   1        if((Timer0_65ms16_2) 
+ 592   1      #if (USE_AVSHIFT_MODE == TRUE)
+ 593   1          || (Timer0_avShiftMode)
+ 594   1      #endif
+ 595   1          )
+ 596   1          return;
+ 597   1      
+ 598   1        TickTimer_65msStop;
+ 599   1      }
+ 600          
+ 601          BYTE t0_wait_keyin_chk(unsigned short i)
+ 602          {
+ 603   1        TickTimer_65msStart(i);
+ 604   1      
+ 605   1        while(Timer0_65ms16)
+ 606   1        {
+ 607   2          if (getkey_simple() == 1)
+ 608   2          {
+ 609   3            Timer0_stop;
+ 610   3            return  TRUE;
+ 611   3          }
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 11  
+
+ 612   2        }
+ 613   1        Timer0_stop;
+ 614   1        return FALSE;
+ 615   1      }
+ 616          
+ 617          void carrier_set()
+ 618          {
+ 619   1        WORD  carrier, i;
+ 620   1      
+ 621   1      #if (USE_SPECIAL_0F4H == TRUE)
+ 622   1        if(ramFormat.strMember.outorder[0] == 0xF4)
+ 623   1          f4_cnt = 0;
+ 624   1      #endif
+ 625   1      
+ 626   1        carrier = ir_stream.Tunion.Tstruct.Carrier;
+ 627   1      
+ 628   1      #if (CRT_OSC == OSC_4MHZ)
+                i=carrier/3;
+              #elif (CRT_OSC == OSC_8MHZ)
+ 631   1      
+ 632   1        if(carrier > CARRIER_DUTY_OFFSET)
+ 633   1        {
+ 634   2          carrier = carrier * 2;
+ 635   2          i = carrier/2;
+ 636   2        }
+ 637   1        else
+ 638   1        {
+ 639   2      #ifdef DUTY_RATIO_1_3
+ 640   2          carrier = carrier * 2;
+ 641   2          i = carrier/3;
+ 642   2      #else
+                  carrier = carrier * 2;
+                  i = carrier/2;
+              #endif
+ 646   2        }
+ 647   1      
+ 648   1      #elif (CRT_OSC == OSC_10MHZ)
+                carrier=(carrier*5)/2;
+                i=carrier/3;
+              #elif (CRT_OSC == OSC_12MHZ)
+                carrier=carrier*3;
+                i=carrier/3;
+              #endif
+ 655   1      
+ 656   1      #if (DUTY_RATIO_1_3 == TRUE) && (DUTY_RATIO_2_3 == TRUE)
+                CRTDATA1 = 255 - (carrier-i);
+                CRTDATA0 = 255 - i;
+              #else
+ 660   1        CRTDATA0 = 255 - i;
+ 661   1        CRTDATA1 = 255 - (carrier-i);
+ 662   1      #endif
+ 663   1      
+ 664   1        carrier_time_us =  (125 * carrier)  / 1000; //usec 단위
+ 665   1        //        8MHz = 125ns        usec단위로 맞추기 위함
+ 666   1      
+ 667   1        carrier_time_ns =  ((125 * carrier) % 1000)/100; //100nsec 단위
+ 668   1      
+ 669   1        wTimer_Max = (0xFFFF / carrier_time_us) - 2;
+ 670   1      
+ 671   1        Envelop_time_max = (carrier_time_us*wTimer_Max);
+ 672   1        Envelop_counter_max = 65536 - (Envelop_time_max / 2) - ((carrier_time_ns * (wTimer_Max/10))/2); //Timing 
+             -계산으로 인해 발생한 nsec 단위 손실에 대한 보상 값
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 12  
+
+ 673   1      
+ 674   1        if((ramFormat.strMember.outorder[0] == 0xf4) || (ramFormat.strMember.option1.flash && ramFormat.strMember
+             -.outorder[0] != 0xf0))
+ 675   1          Before_CRT_State = STOP;
+ 676   1        else
+ 677   1          Before_CRT_State = RUN;
+ 678   1        
+ 679   1        reload_time = TRUE;
+ 680   1        non_special_flash_start = TRUE;
+ 681   1        before_reload_state = FALSE;
+ 682   1        continuous_reload = FALSE;
+ 683   1        
+ 684   1        if(ramFormat.strMember.outorder[0] == 0xf0)
+ 685   1          wTimer = *uptr_Timer;
+ 686   1      
+ 687   1        CRTCON1 |= (1<<CRTOVEN);  // CRTOVEN: CRT interrupt triggered by overflow enable bit.
+ 688   1        CRT_onoff(CRT_ON);
+ 689   1        Interrupt_Enable;
+ 690   1        Timer2_Start();
+ 691   1      }
+ 692          
+ 693          void EnvelopCarrierOff(void)
+ 694          {
+ 695   1        RCAP2L = 0xFF;
+ 696   1        RCAP2H = 0xFF;
+ 697   1        CRT_onoff(CRT_OFF);
+ 698   1        P3 &= ~0x01;  
+ 699   1        Envelop_Timer_Stop;
+ 700   1      }
+ 701          
+ 702          //----------------------------------------
+ 703          // ir out timer stop
+ 704          //----------------------------------------
+ 705          void pulse_stop(void)
+ 706          {
+ 707   1        if(ir_ok)
+ 708   1        {
+ 709   2          if(uptr_Timer == Repeat_Start)  t1_int = 2;
+ 710   2      
+ 711   2          while(t1_int!=2){}
+ 712   2        }
+ 713   1        Delayby10us(50);
+ 714   1        
+ 715   1        //t2 envelop
+ 716   1        EnvelopCarrierOff();
+ 717   1      
+ 718   1      
+ 719   1        ir_ok = FALSE;
+ 720   1        IrKeyBuf=0xff;
+ 721   1        backup_IrKeyBuf=0xff;
+ 722   1        outframeNo=0;
+ 723   1      }
+ 724          
+ 725          #if 1
+ 726          void CalculateEnvelope(void)
+ 727          {
+ 728   1        WORD  i;
+ 729   1        WORD  wBitStream = 0;
+ 730   1      
+ 731   1        if(ramFormat.strMember.outorder[0] == 0xf4)
+ 732   1          return;
+ 733   1      
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 13  
+
+ 734   1        if(ramFormat.strMember.option1.flash == 1)
+ 735   1          return;
+ 736   1      
+ 737   1        for(i=0; i<BITSTREAMLENGTH; i++)
+ 738   1        {
+ 739   2          //56Khz 이상 ->  (h/l - carrier1) -ea-
+ 740   2          if(ir_stream.Tunion.Tstruct.Carrier <= 75)
+ 741   2          {
+ 742   3            ir_stream.Tunion.Tstruct.pulse.BitStream[i] -= 1;
+ 743   3          }
+ 744   2          else
+ 745   2          {
+ 746   3            wBitStream = (ir_stream.Tunion.Tstruct.pulse.BitStream[i] & 0x8fff);
+ 747   3      
+ 748   3            // 첫번째 펄스가 low 일 수 있기 때문에 아래 연산 skip
+ 749   3            if(i == 0 && wBitStream == 0x8000) continue;
+ 750   3      
+ 751   3            if(wBitStream >= 4) // high and low 공통
+ 752   3            {
+ 753   4              //ir_stream.Tunion.Tstruct.pulse.BitStream[i] -= 1;
+ 754   4      
+ 755   4              if(i%2 && ramFormat.strMember.option1.flash == 0)     // low
+ 756   4              {
+ 757   5                ir_stream.Tunion.Tstruct.pulse.BitStream[i] -= 1;
+ 758   5              }
+ 759   4            }
+ 760   3          }
+ 761   2        }
+ 762   1      }
+ 763          #endif
+ 764          
+ 765          //----------------------------------------
+ 766          // ir out
+ 767          //----------------------------------------
+ 768          void send_ur(void)
+ 769          {
+ 770   1        WORD  addAddr;
+ 771   1      #if 0
+                int16u  xdata Reduce_1stWord;
+                int16u  xdata Reduce_2ndWord;
+              #endif
+ 775   1      
+ 776   1      #if 1
+ 777   1      #if (IRZIP_CARR_2BYTES == TRUE)
+                if(!ir_zip.Tunion.Tstruct.Carrier)
+              #else
+ 780   1        if(!ir_zip.Tunion.data1[0])
+ 781   1      #endif
+ 782   1          CalculateEnvelope();
+ 783   1      #endif
+ 784   1        ////////////////////////////////////////////////////////////////
+ 785   1        //1'st
+ 786   1        //start pointer -> uptr_Timer
+ 787   1        uptr_Timer = (WORD*) &ir_stream.Tunion.Tstruct.pulse.BitStream[0];  //bitstream start address load in uptr
+             -_timer
+ 788   1        //First_Start=uptr_Timer;
+ 789   1      
+ 790   1        if((*uptr_Timer & 0x7fff) == 0)
+ 791   1        {
+ 792   2          while((*uptr_Timer & 0x7fff) == 0)              // data format ?? low|high?????? ??? ? bit?? 0???? ???.
+ 793   2          {
+ 794   3            uptr_Timer += 2;
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 14  
+
+ 795   3          }
+ 796   2        }
+ 797   1      
+ 798   1        //end pointer -> uptr_TimerEnd
+ 799   1        //uptr_TimerEnd=(WORD*) &ir_stream.Tunion.Tstruct.pulse.BitStream[ir_stream.Tunion.Tstruct.bidxEndWord1];
+ 800   1        uptr_TimerEnd = (WORD*) &ir_stream.Tunion.Tstruct.pulse.BitStream[0];
+ 801   1        addAddr       = (WORD) ir_stream.Tunion.Tstruct.bidxEndWord1;
+ 802   1        uptr_TimerEnd += addAddr;
+ 803   1        First_End     = uptr_TimerEnd;
+ 804   1      
+ 805   1        wTimer = (*uptr_Timer);
+ 806   1      
+ 807   1        if(uptr_Timer >= &ir_stream.Tunion.Tstruct.pulse.BitStream[BITSTREAMLENGTH] ||
+ 808   1          First_End >= &ir_stream.Tunion.Tstruct.pulse.BitStream[BITSTREAMLENGTH])
+ 809   1        {
+ 810   2          ir_ok = FALSE;
+ 811   2          return;
+ 812   2        }
+ 813   1      
+ 814   1        ////////////////////////////////////////////////////////////////
+ 815   1        //2'nd
+ 816   1        //start pointer -> uptr_Timer
+ 817   1        Repeat_Start = (WORD*) &ir_stream.Tunion.Tstruct.pulse.BitStream[0];  //bitstream start address load in up
+             -tr_timer
+ 818   1        addAddr      = (WORD) ir_stream.Tunion.Tstruct.bidxRepeatWord;
+ 819   1        Repeat_Start += addAddr;
+ 820   1      
+ 821   1        if((*Repeat_Start & 0x7fff) == 0)
+ 822   1        {
+ 823   2          while((*Repeat_Start&0x7fff) == 0)              // data format ?? low|high?????? ??? ? bit?? 0???? ???.
+ 824   2          {
+ 825   3            Repeat_Start +=2;
+ 826   3          }
+ 827   2        }
+ 828   1      
+ 829   1        //end pointer -> uptr_TimerEnd
+ 830   1        Repeat_End = (WORD*) &ir_stream.Tunion.Tstruct.pulse.BitStream[0];
+ 831   1        addAddr    = (WORD) ir_stream.Tunion.Tstruct.bidxEndWord2;
+ 832   1        Repeat_End += addAddr;
+ 833   1      
+ 834   1        if(Repeat_Start >= &ir_stream.Tunion.Tstruct.pulse.BitStream[BITSTREAMLENGTH] ||
+ 835   1          Repeat_End >= &ir_stream.Tunion.Tstruct.pulse.BitStream[BITSTREAMLENGTH])
+ 836   1        {
+ 837   2          ir_ok = FALSE;
+ 838   2          return;
+ 839   2        }
+ 840   1      
+ 841   1      #if 0
+              //  Reduce_1stWord=(int16u) (4000/ir_stream.Tunion.Tstruct.Carrier);
+              //  Reduce_2ndWord=(int16u) (4000/ir_stream.Tunion.Tstruct.Carrier);
+                Reduce_1stWord=(int16u) (4000/((ir_stream.Tunion.Tstruct.Carrier*5)/8));
+                Reduce_2ndWord=(int16u) (4000/((ir_stream.Tunion.Tstruct.Carrier*5)/2));
+              
+              #if (IRZIP_CARR_2BYTES == TRUE)
+                if((!ir_zip.Tunion.Tstruct.Carrier)&&(First_End != Repeat_Start))
+              #else
+                if((!ir_zip.Tunion.data1[0])&&(First_End != Repeat_Start))
+              #endif
+                {
+                  ir_stream.Tunion.Tstruct.pulse.BitStream[ir_stream.Tunion.Tstruct.bidxEndWord1]-=Reduce_1stWord;
+                  ir_stream.Tunion.Tstruct.pulse.BitStream[ir_stream.Tunion.Tstruct.bidxEndWord2]-=Reduce_2ndWord;
+                }
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 15  
+
+              #endif
+ 857   1        
+ 858   1        carrier_set();
+ 859   1      }
+ 860          
+ 861          //----------------------------------------
+ 862          // standby ir out
+ 863          //----------------------------------------
+ 864          byte Send_UR_Ready(void)
+ 865          {
+ 866   1        UWORD   uWord12;              //uWord12 -> 1'st word time
+ 867   1        ULONG   ulIndex;
+ 868   1      
+ 869   1        if(curr_state==NORMAL_MODE)
+ 870   1        {
+ 871   2      #if (USE_IR_LEARN == TRUE)
+                  if(curr_device == DEV_TV)
+                  {
+                    LearnDataRW(READ, curr_source);   //>>> check to learning code
+              
+              #if (IRZIP_CARR_2BYTES == TRUE)
+                    if(ir_zip.Tunion.Tstruct.Carrier)
+              #else
+                    if(ir_zip.Tunion.data1[0])
+              #endif
+                    {
+                      //Fill_Learn_RawData();
+              
+                      MeltBitPattern(&ir_zip);
+              
+                      if(ir_stream.Tunion.Tstruct.Carrier==400)   //fix to 400 at flash type
+                      {
+                        ramFormat.strMember.option1.flash=1;
+                        //ir_stream.Tunion.Tstruct.Carrier=106;
+                        ir_stream.Tunion.Tstruct.Carrier=100;   //40KHz
+                      }
+                      else
+                        ramFormat.strMember.option1.flash=0;
+              
+                      return TRUE;
+                    }
+                  }
+                  else
+                    IrZipData_Clear();
+              #endif
+ 901   2      
+ 902   2      #if 0
+                  pTemp=set_no.set_reg;
+                  pCodeaddr_1=(int8u*)GetCodeAddress_set(*(pTemp+curr_source));   //pCodeaddr_1=set no?? ????? address in e
+             -ach device       // (idxDevice, code)
+              #else
+ 906   2          if(curr_device==DEV_STB)
+ 907   2          {
+ 908   3            //setting_no=1;
+ 909   3            setting_no=set_no.set_member.set_no.stb_src;
+ 910   3          }
+ 911   2      #if (USE_TEST_MODE == TRUE)
+ 912   2          else if(curr_device==DEV_TESTMODE)
+ 913   2          {
+ 914   3            setting_no=1;
+ 915   3          }
+ 916   2      #endif
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 16  
+
+ 917   2          else
+ 918   2          {
+ 919   3      #if (USE_2BYTE_SETTING_NO == TRUE)
+ 920   3            pTemp = set_no.set_reg;
+ 921   3            //setting_no = *(pTemp+(curr_source*INC_PTR_SIZE));
+ 922   3            //setting_no |= *(pTemp+(curr_source*INC_PTR_SIZE)+1)<<8;
+ 923   3            setting_no = *(pTemp+(curr_source*INC_PTR_SIZE))<<8;
+ 924   3            setting_no |= *(pTemp+(curr_source*INC_PTR_SIZE)+1);
+ 925   3      #else
+                    pTemp = set_no.set_reg;
+                    setting_no = *(pTemp+(curr_source*INC_PTR_SIZE));
+              #endif
+ 929   3          }
+ 930   2      #endif
+ 931   2      
+ 932   2      #if (USE_BATCH_SS_LG == TRUE)
+ 933   2          if(batch_mode_setting_no)
+ 934   2            setting_no=batch_mode_setting_no;
+ 935   2      #endif
+ 936   2      
+ 937   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 938   2          if(curr_device==DEV_STB)
+ 939   2          {
+ 940   3            pCodeaddr_1=(int8u*)GetCodeAddress_set(1);
+ 941   3          }
+ 942   2          else
+ 943   2      #endif
+ 944   2            pCodeaddr_1=(int8u*)GetCodeAddress_set(setting_no);
+ 945   2        }//end of normal out mode
+ 946   1        else
+ 947   1        {
+ 948   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+ 949   2          if(curr_device==DEV_STB)
+ 950   2          {
+ 951   3            pCodeaddr_1=(int8u*)GetCodeAddress_set(1);
+ 952   3          }
+ 953   2          else
+ 954   2      #endif
+ 955   2            pCodeaddr_1=(int8u*)GetCodeAddress_set(setting_no);
+ 956   2        }//end of setting out mode.
+ 957   1      
+ 958   1      #if (USE_BATCH_SS_LG == TRUE)
+ 959   1        batch_mode_setting_no = 0;
+ 960   1      #endif
+ 961   1      
+ 962   1        if(!LoadSetNumber(pCodeaddr_1)) return FALSE;
+ 963   1      
+ 964   1        if(!LoadCustDataWithFormat(pCodeaddr_1)) return FALSE;
+ 965   1      
+ 966   1        ir_stream.Tunion.Tstruct.Carrier=ramCode.bCarrier;
+ 967   1      
+ 968   1        // 첫번째 출력은 항상 HIGH
+ 969   1        ir_stream.Tunion.Tstruct.pulse.BitStream[0]=0x8000;
+ 970   1        npWaddr_1=(WORD*) &ir_stream.Tunion.Tstruct.pulse.BitStream[0];
+ 971   1      
+ 972   1      
+ 973   1        if((ramFormat.strMember.outorder[0]&0xf0)==0xf0)     // special format//tg skip
+ 974   1        {
+ 975   2            return (*pfunc_special[ramFormat.strMember.outorder[0]&0x0f])();
+ 976   2        }
+ 977   1      
+ 978   1        uWord12=ramFormat.strMember.word1;                  // word계산.
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 17  
+
+ 979   1        npWaddr_1=FillBitStreamFromOutOrder(0,(WORD*)npWaddr_1,(WORD*)&uWord12);
+ 980   1      
+ 981   1        if(ramFormat.strMember.option1.non_word)
+ 982   1          uWord12=ramFormat.strMember.word1;        // an interval of WAIT
+ 983   1      
+ 984   1        if(*npWaddr_1&0x8000)         // Ending the 2'nd Word
+ 985   1        {
+ 986   2          if(++npWaddr_1>=(WORD*)&ir_stream.Tunion.Tstruct.pulse.BitStream[MAX_BITSTREAM])
+ 987   2            npWaddr_1--;
+ 988   2          *npWaddr_1=0;
+ 989   2        }
+ 990   1      
+ 991   1        *npWaddr_1+=uWord12;
+ 992   1        ir_stream.Tunion.Tstruct.bidxEndWord1=(npWaddr_1-&ir_stream.Tunion.Tstruct.pulse.BitStream[0]);   // the 
+             -wait POINTER of 1'st word(word ????)
+ 993   1      
+ 994   1        if(ramFormat.strMember.option1.repeat)
+ 995   1        {
+ 996   2          if(++npWaddr_1>=(WORD*)&ir_stream.Tunion.Tstruct.pulse.BitStream[MAX_BITSTREAM]) npWaddr_1--;
+ 997   2      
+ 998   2          *npWaddr_1=0x8000;                               // repeat start //!!! ???? ??? pulse?? HIGH???? !!!///
+ 999   2          ir_stream.Tunion.Tstruct.bidxRepeatWord=(npWaddr_1-&ir_stream.Tunion.Tstruct.pulse.BitStream[0]);  // th
+             -e wait POINTER of 1'st word
+1000   2      
+1001   2          uWord12=ramFormat.strMember.word2;              // word계산.
+1002   2          npWaddr_1=FillBitStreamFromOutOrder(8,(WORD*)npWaddr_1,(WORD*)&uWord12);
+1003   2      
+1004   2          if(ramFormat.strMember.option1.non_word)
+1005   2            uWord12=ramFormat.strMember.word2;      // an interval of WAIT
+1006   2      
+1007   2          if(*npWaddr_1&0x8000)         // Ending the 2'nd Word
+1008   2          {
+1009   3            if(++npWaddr_1>=(WORD*)&ir_stream.Tunion.Tstruct.pulse.BitStream[MAX_BITSTREAM])
+1010   3              npWaddr_1--;
+1011   3            *npWaddr_1=0;
+1012   3          }
+1013   2          
+1014   2          *npWaddr_1+=(uWord12+20);
+1015   2          ir_stream.Tunion.Tstruct.bidxEndWord2=(npWaddr_1-&ir_stream.Tunion.Tstruct.pulse.BitStream[0]);
+1016   2        }
+1017   1        else
+1018   1        {
+1019   2          ir_stream.Tunion.Tstruct.bidxRepeatWord=0;
+1020   2          ir_stream.Tunion.Tstruct.bidxEndWord2=ir_stream.Tunion.Tstruct.bidxEndWord1;  // the wait POINTER of 1'st
+             - word
+1021   2        }
+1022   1      
+1023   1        if(ramFormat.strMember.option1.single)              // single key존재.
+1024   1        {
+1025   2          ulIndex=ramCode.Data;
+1026   2          ulIndex>>=ramFormat.strMember.datasize.data1;
+1027   2      
+1028   2          ulIndex&=(ULONG)pbMaskIndex[ramFormat.strMember.datasize.index1+ramFormat.strMember.customsize.index2-1]
+             -;
+1029   2      
+1030   2          if(!ulIndex)                                    // single key
+1031   2          {
+1032   3            ir_stream.Tunion.Tstruct.bidxRepeatWord=ir_stream.Tunion.Tstruct.bidxEndWord2;
+1033   3          }
+1034   2        }
+1035   1        return TRUE;
+1036   1      }
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 18  
+
+1037          
+1038          //----------------------------------------
+1039          // time value get.
+1040          //----------------------------------------
+1041          WORD* SetBitStreamFromNibble(WORD* npWaddr, BYTE* npbAddr, int16u size, UWORD* npWord12)
+1042          {
+1043   1        WORD  i, j;
+1044   1        byte  bTemp, bTimePos;
+1045   1      
+1046   1        // Time value 가 nibble 원래 size를 2배로 처리
+1047   1        size <<= 1;
+1048   1      
+1049   1        for(i=0; i<size; i++)
+1050   1        {
+1051   2          j  =  i;
+1052   2          j >>= 1;
+1053   2      
+1054   2          bTemp = npbAddr[j];             //btemp=logic (H001 L002)
+1055   2      
+1056   2          if((i & 0x01) == 0) bTemp >>= 4;
+1057   2          else        bTemp &= 0x0f;
+1058   2      
+1059   2          // Time 설정이 x000 일 경우 예외처리
+1060   2          if((bTemp & _0000_0111B) == 0) break;
+1061   2      
+1062   2          if(bTemp & _0000_1000B)                          // HIGH
+1063   2          {
+1064   3            if((*npWaddr & 0x8000) == 0)
+1065   3            {
+1066   4              if(++npWaddr >= (WORD*)&ir_stream.Tunion.Tstruct.pulse.BitStream[MAX_BITSTREAM])
+1067   4              {
+1068   5                npWaddr--;
+1069   5              }
+1070   4      
+1071   4              *npWaddr = 0x8000;
+1072   4            }
+1073   3          }
+1074   2          else                                    // LOW
+1075   2          {
+1076   3            if(*npWaddr & 0x8000)
+1077   3            {
+1078   4              if(++npWaddr >= (WORD*)&ir_stream.Tunion.Tstruct.pulse.BitStream[MAX_BITSTREAM])
+1079   4              {
+1080   5                npWaddr--;
+1081   5              }
+1082   4      
+1083   4              *npWaddr = 0;
+1084   4            }
+1085   3          }
+1086   2      
+1087   2          bTimePos = (bTemp & _0000_0111B) - 1;
+1088   2          *npWaddr  += ramFormat.strMember.timeval[bTimePos];
+1089   2          *npWord12 -= (ramFormat.strMember.timeval[bTimePos]-1);
+1090   2        }
+1091   1      
+1092   1        return npWaddr;
+1093   1      }
+1094          
+1095          //----------------------------------------
+1096          // get time value of out order
+1097          //----------------------------------------
+1098          WORD*   FillBitStreamFromOutOrder(int16u start, WORD* npWaddr, UWORD* npWord12)
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 19  
+
+1099          {
+1100   1        int16u  i,j;
+1101   1      
+1102   1        BYTE  bTemp; //->main.h
+1103   1        ULONG   ulTemp;
+1104   1        BYTE    repeat[3];
+1105   1      
+1106   1        for(i=start;i<16;i++)                      // output order*2: nibble
+1107   1        {
+1108   2          bTemp=ramFormat.strMember.outorder[i/2];
+1109   2                                  //if((i%2)==0)    bTemp>>=4;
+1110   2          if((i & 0x01)==0)
+1111   2            bTemp>>=4;
+1112   2          else
+1113   2            bTemp&=0x0f;
+1114   2      
+1115   2          switch(bTemp)
+1116   2          {
+1117   3            case    0:                          // lead
+1118   3            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.lead[0],3,npWord12);
+1119   3            break;
+1120   3      
+1121   3            case    1:                          // system
+1122   3            ulTemp=ramCode.Custom;
+1123   3      
+1124   3      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+1125   3            if(curr_device == DEV_STB)
+1126   3            {
+1127   4              if(curr_state == SET_MODE_DIGIT)
+1128   4              {
+1129   5                ulTemp += (setting_no - IR_CUSTOM_NUM_MIN)<<8;
+1130   5              }
+1131   4              else if(curr_state == SET_MODE_AUTO)
+1132   4              {
+1133   5                ulTemp += (StbNo_AutoSearch - IR_CUSTOM_NUM_MIN)<<8;
+1134   5              }
+1135   4              else
+1136   4              {
+1137   5                ulTemp += (set_no.set_member.set_no.stb_src - IR_CUSTOM_NUM_MIN)<<8;
+1138   5              }
+1139   4            }
+1140   3      #endif
+1141   3      
+1142   3            for(j=0;j<ramFormat.strMember.customsize.custom;j++)
+1143   3            {
+1144   4              if(ulTemp&0x01) npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1145   4              else            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1146   4              ulTemp>>=1;
+1147   4            }
+1148   3            break;
+1149   3      
+1150   3            case    2:                          // system bar
+1151   3            ulTemp=ramCode.Custom;
+1152   3            for(j=0;j<ramFormat.strMember.customsize.custom;j++)
+1153   3            {
+1154   4              if(ulTemp&0x01) npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1155   4              else            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1156   4              ulTemp>>=1;
+1157   4            }
+1158   3            break;
+1159   3      
+1160   3            case    3:                          // data
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 20  
+
+1161   3            ulTemp=ramCode.Data;
+1162   3      
+1163   3            for(j=0;j<ramFormat.strMember.datasize.data1;j++)
+1164   3            {
+1165   4              if(ulTemp&0x01) npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1166   4              else            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1167   4              ulTemp>>=1;
+1168   4            }
+1169   3            break;
+1170   3      
+1171   3            case    4:                          // data bar
+1172   3            ulTemp=ramCode.Data;
+1173   3      
+1174   3            for(j=0;j<ramFormat.strMember.datasize.data1;j++)
+1175   3            {
+1176   4              if(ulTemp&0x01) npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1177   4              else            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1178   4              ulTemp>>=1;
+1179   4            }
+1180   3            break;
+1181   3      
+1182   3            case    5:                          // end
+1183   3            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.end_pulse,1,npWord12);
+1184   3            break;
+1185   3      
+1186   3            case    6:                          // *** toggle
+1187   3            if(gl_Toggle[curr_source]&0x01)//gb_ToggleBit[gu_CurDevice-AUDIO]&0x01)
+1188   3            {
+1189   4              npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1190   4            }
+1191   3            else
+1192   3            {
+1193   4              npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1194   4            }
+1195   3            break;
+1196   3      
+1197   3            case    7:                          // *** toggle2
+1198   3            if(gl_Toggle[curr_source]&0x02)
+1199   3            {
+1200   4              npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1201   4            }
+1202   3            else
+1203   3            {
+1204   4              npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1205   4            }
+1206   3            break;
+1207   3      
+1208   3            case    8:                          // logic1
+1209   3            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic1[0],3,npWord12);
+1210   3            break;
+1211   3      
+1212   3            case    9:                          // logic0
+1213   3            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.logic0[0],3,npWord12);
+1214   3            break;
+1215   3      
+1216   3            case  0x0a:                         // repeat
+1217   3            npWaddr=SetBitStreamFromNibble(npWaddr,&ramFormat.strMember.repeat[0],3,npWord12);
+1218   3            break;
+1219   3      
+1220   3            case  0x0b:                         // spare
+1221   3            case  0x0c:                         //
+1222   3            break;
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 21  
+
+1223   3      
+1224   3            case  0x0d:                         // BIG TOGGLE
+1225   3            //  gb_BigToggle=!gb_BigToggle;
+1226   3            for(j=0;j<3;j++)                //
+1227   3            {
+1228   4              repeat[j]=ramFormat.strMember.repeat[j];
+1229   4              if(gl_Toggle[curr_source]&0x01)//gb_BigToggle==0)
+1230   4              {
+1231   5                if(repeat[j]&0x80)  repeat[j]&=0x7f;
+1232   5                else                repeat[j]|=0x80;
+1233   5      
+1234   5                if(repeat[j]&0x08)  repeat[j]&=0xf7;
+1235   5                else                repeat[j]|=0x08;
+1236   5              }
+1237   4            }
+1238   3            npWaddr=SetBitStreamFromNibble(npWaddr,&repeat[0],3,npWord12);
+1239   3            break;
+1240   3      
+1241   3            case  0x0e:                         //
+1242   3            break;
+1243   3      
+1244   3            case  0x0f:                         // end
+1245   3            i=8*2;                          // exit;
+1246   3            break;
+1247   3          }
+1248   2        }
+1249   1        return npWaddr;
+1250   1      }
+1251          
+1252          //----------------------------------------
+1253          // code format load
+1254          //----------------------------------------
+1255          BYTE LoadFormat(BYTE formatno)
+1256          {
+1257   1          WORD    wAddr;
+1258   1          BYTE    data1;
+1259   1          BYTE    index;
+1260   1        BYTE* pAddr;
+1261   1      #if (USE_DATA_ALIGNMENT == TRUE)
+                  BYTE    index_even=0;
+              #endif
+1264   1      
+1265   1      #if (USE_ADDRESS_32BIT == TRUE)
+                ULONG*  pX_Format;
+              #else
+1268   1        WORD* pX_Format;
+1269   1      #endif
+1270   1      
+1271   1          int8u i;
+1272   1      
+1273   1      #if (USE_ADDRESS_32BIT == TRUE)
+                pX_Format=(ULONG*)X_FORMAT;
+              #else
+1276   1        pX_Format=(WORD*)X_FORMAT;
+1277   1      #endif
+1278   1      
+1279   1        pX_Format=(pX_Format+curr_device);        //each device format pointer
+1280   1        pAddr=(BYTE code*) *pX_Format;        //
+1281   1      
+1282   1      
+1283   1          data1=*pAddr;
+1284   1          if(!data1)   return  FALSE;       //end pointer
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 22  
+
+1285   1      
+1286   1          while(data1!=formatno)
+1287   1          {
+1288   2              pAddr=FormatNextAddrCal(pAddr);
+1289   2              data1=*pAddr;
+1290   2      
+1291   2              if(!data1)   return FALSE;               // not found
+1292   2          }
+1293   1      
+1294   1          for(i=0;i<38;i++)
+1295   1          {
+1296   2              ramFormat.byteArray[i]=*pAddr++;
+1297   2          }
+1298   1      
+1299   1          index=0;
+1300   1          index+=ramFormat.strMember.size.time;
+1301   1          index+=ramFormat.strMember.size.outp;
+1302   1          index+=ramFormat.strMember.option2.repeat;
+1303   1          index+=ramFormat.strMember.option2.lead;
+1304   1          index+=ramFormat.strMember.option2.logic0;
+1305   1          index+=ramFormat.strMember.option2.logic1;
+1306   1          index+=10;                                  // 11-1=index
+1307   1      
+1308   1      #if (USE_DATA_ALIGNMENT == TRUE)
+                if(!(index & 0x01))
+                {
+                  index_even=1;
+                  index+=1;
+                }
+              #endif
+1315   1      
+1316   1                                                      
+1317   1      #if (USE_LITTLE_ENDIAN == FALSE)
+1318   1          wAddr=(UWORD)ramFormat.byteArray[index];                  // WORD2
+1319   1          ramFormat.strMember.word2=(UWORD)(ramFormat.byteArray[--index]<<8)+wAddr;
+1320   1        
+1321   1          wAddr=(UWORD)ramFormat.byteArray[--index];
+1322   1          ramFormat.strMember.word1=(UWORD)(ramFormat.byteArray[--index]<<8)+wAddr; 
+1323   1      #else
+                  wAddr=(UWORD)(ramFormat.byteArray[index]<<8);
+                  ramFormat.strMember.word2=(UWORD)(ramFormat.byteArray[--index])+wAddr;
+              
+                  wAddr=(UWORD)(ramFormat.byteArray[--index]<<8);
+                  ramFormat.strMember.word1=(UWORD)(ramFormat.byteArray[--index])+wAddr;
+              #endif
+1330   1      
+1331   1      #if (USE_DATA_ALIGNMENT == TRUE)
+                if(index_even)
+                  index-=1;
+              #endif
+1335   1                                                      // TIME ARRAY
+1336   1          data1=ramFormat.strMember.size.time;
+1337   1          for(i=0;i<data1;i++)
+1338   1          {
+1339   2              ramFormat.strMember.timeval[(data1-1)-i]=ramFormat.byteArray[--index];
+1340   2          }
+1341   1          for(i=data1;i<7;i++)   ramFormat.strMember.timeval[i]=0;
+1342   1      
+1343   1                                                      // END PULSE
+1344   1          ramFormat.strMember.end_pulse=ramFormat.byteArray[--index];
+1345   1      
+1346   1                                                      // REPEAT
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 23  
+
+1347   1          data1=ramFormat.strMember.option2.repeat;
+1348   1          for(i=0;i<data1;i++)
+1349   1          {
+1350   2              ramFormat.strMember.repeat[(data1-1)-i]=ramFormat.byteArray[--index];
+1351   2          }
+1352   1          for(i=data1;i<3;i++)   ramFormat.strMember.repeat[i]=0;
+1353   1      
+1354   1                                                      // LEAD
+1355   1          data1=ramFormat.strMember.option2.lead;
+1356   1          for(i=0;i<data1;i++)
+1357   1          {
+1358   2              ramFormat.strMember.lead[(data1-1)-i]=ramFormat.byteArray[--index];
+1359   2          }
+1360   1          for(i=data1;i<3;i++)   ramFormat.strMember.lead[i]=0;
+1361   1      
+1362   1                                                      // LOGIC0
+1363   1          data1=ramFormat.strMember.option2.logic0;
+1364   1          for(i=0;i<data1;i++)
+1365   1          {
+1366   2              ramFormat.strMember.logic0[(data1-1)-i]=ramFormat.byteArray[--index];
+1367   2          }
+1368   1          for(i=data1;i<3;i++)   ramFormat.strMember.logic0[i]=0;
+1369   1      
+1370   1                                                      // LOGIC1
+1371   1          data1=ramFormat.strMember.option2.logic1;
+1372   1          for(i=0;i<data1;i++)
+1373   1          {
+1374   2              ramFormat.strMember.logic1[(data1-1)-i]=ramFormat.byteArray[--index];
+1375   2          }
+1376   1          for(i=data1;i<3;i++)   ramFormat.strMember.logic1[i]=0;
+1377   1      
+1378   1                                                      // OUTPUT ORDER
+1379   1          data1=ramFormat.strMember.size.outp;
+1380   1          for(i=0;i<data1;i++)
+1381   1          {
+1382   2              ramFormat.strMember.outorder[(data1-1)-i]=ramFormat.byteArray[--index];
+1383   2          }
+1384   1          for(i=data1;i<8;i++)   ramFormat.strMember.outorder[i]=0xFF;
+1385   1      
+1386   1        return TRUE;
+1387   1      }
+1388          
+1389          //---------------------------------------------------------------
+1390          //    FormatRead() subroutines
+1391          //-----------------------------------------------------------------
+1392          BYTE  *FormatNextAddrCal(BYTE code* pAddr)
+1393          {
+1394   1        byte  sum, buf;
+1395   1      
+1396   1        sum = 0;
+1397   1      
+1398   1        ++pAddr;                                    // format no + 1 => size
+1399   1        buf = *pAddr;                               // buf=size
+1400   1        sum = (buf & 0x0f);                         // 최대 TIME BYTE수 - 실제TIME SIZE
+1401   1        sum += (buf >> 4);                          // 최대 출력순서BYTE수 - 실제 출력순서SIZE
+1402   1      
+1403   1        pAddr += 2;                                   // option 2(logic1,logic0,lead,repeat size)
+1404   1      
+1405   1        buf = *pAddr;
+1406   1        sum += (buf & 0x03);
+1407   1        sum += (buf>>2 & 0x03);
+1408   1        sum += (buf>>4 & 0x03);
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 24  
+
+1409   1        sum += (buf>>6);
+1410   1      
+1411   1        pAddr += (sum+8);                             // +8(앞에서 +3) : the number of an indispensable member
+1412   1      
+1413   1      #if (USE_DATA_ALIGNMENT == TRUE)
+                if(!(sum & 0x01))
+                  pAddr+=1;
+              #endif
+1417   1      
+1418   1        return pAddr;
+1419   1      
+1420   1      }
+1421          
+1422          BOOL LoadCustDataWithFormat(BYTE  * pCodeaddr)
+1423          {
+1424   1        int16u  i;
+1425   1        ULONG ulIndex;
+1426   1        BYTE  k;
+1427   1        BYTE*   cpPowerToggle;
+1428   1        BYTE  idx_key_local;
+1429   1        BYTE  idxKey;
+1430   1        ULONG*  pulPtr;
+1431   1      
+1432   1      #if (USE_ADDRESS_32BIT == TRUE)
+                ULONG uOffset;
+              #else
+1435   1        WORD  uOffset;
+1436   1      #endif
+1437   1      
+1438   1        idxKey=get_map_pointer();
+1439   1      
+1440   1        if(idxKey==MAP_NG) return FALSE;                 //idxKey-> map value in each device
+1441   1      
+1442   1        //pMultiCust=(BYTE *)0;
+1443   1        pTemp=0;
+1444   1      
+1445   1        pCodeaddr+=INC_PTR_SIZE;                                // next
+1446   1      
+1447   1        pCodeLast=pCodeaddr+(*pCodeaddr);
+1448   1        pCodeaddr++;                                // format no
+1449   1      
+1450   1        if(!LoadFormat(*pCodeaddr)) return FALSE;
+1451   1      
+1452   1        pCodeaddr++;                                // carrier
+1453   1        ramCode.bCarrier=*pCodeaddr;
+1454   1      
+1455   1        pCodeaddr++;                                // custom area
+1456   1        
+1457   1        if(!ramFormat.strMember.option1.multi_cust)
+1458   1        {   
+1459   2      #if (USE_ADDRESS_32BIT == FALSE)
+1460   2          pulPtr=(ULONG *)pCodeaddr;
+1461   2          ramCode.Custom=*pulPtr;   
+1462   2      #else
+                  //4-byte 주소 체계로 인하여, 만약 address 가 4-byte 단위로 떨어지지 않으면 연산 �
+             -��러가 발생하여 위 코드는 주석 처리하고
+                  //대신에 1-byte 단위로 처리함(James.KIM)
+                  ramCode.Custom =  (pCodeaddr[3] << 24);
+                  ramCode.Custom |= (pCodeaddr[2] << 16);
+                  ramCode.Custom |= (pCodeaddr[1] << 8);
+                  ramCode.Custom |=  pCodeaddr[0];
+              #endif
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 25  
+
+1470   2      
+1471   2      #if (USE_LITTLE_ENDIAN == FALSE)
+1472   2          Convert_cd(&(ramCode.Custom));
+1473   2      #endif
+1474   2          pCodeaddr+=(ramFormat.strMember.customsize.custom+7)/8;
+1475   2        }
+1476   1        else                                        // multi custom
+1477   1        {
+1478   2      #if (USE_ADDRESS_32BIT == TRUE)
+              #if 0
+                  pWordptr=(ULONG *)pCodeaddr;
+                  uOffset=(ULONG)*pWordptr;
+                  if(uOffset>(ULONG)0x1ffff)
+                    return FALSE;
+              #else
+                  //4-byte 주소 체계로 인하여, 만약 address 가 4-byte 단위로 떨어지지 않으면 연산 �
+             -��러가 발생하여 위 코드는 주석 처리하고
+                  //대신에 1-byte 단위로 처리함(James.KIM)
+                  uOffset =  (pCodeaddr[3] << 24);
+                  uOffset |= (pCodeaddr[2] << 16);
+                  uOffset |= (pCodeaddr[1] << 8);
+                  uOffset |=  pCodeaddr[0];
+              #endif
+              #else
+1493   2          pWordptr = (WORD *)pCodeaddr;
+1494   2          uOffset = (UWORD)*pWordptr;   
+1495   2      #endif
+1496   2      
+1497   2          pTemp = (int8u code*)uOffset;
+1498   2      
+1499   2      #if (USE_ADDRESS_32BIT == TRUE)
+                  pCodeaddr+=4;     // address
+              #else
+1502   2          pCodeaddr+=2;     // address
+1503   2      #endif
+1504   2        }
+1505   1      
+1506   1        i=ramFormat.strMember.datasize.data1+ramFormat.strMember.datasize.index1+ramFormat.strMember.customsize.i
+             -ndex2;
+1507   1        i=(i+7)/8;
+1508   1      
+1509   1        if(power_toggle&0x01)
+1510   1        {
+1511   2          cpPowerToggle=(BYTE*)X_TOGGKEY;
+1512   2      #if 0
+                  cpPowerToggle+=curr_device;
+              #endif
+1515   2      
+1516   2          //if(*cpPowerToggle==key_buf[0])
+1517   2          if((*cpPowerToggle==IrKeyBuf) 
+1518   2            || (IrKeyBuf==KEY_ALLPOWER)
+1519   2            )
+1520   2          {
+1521   3            k=i;
+1522   3      
+1523   3            cpPowerToggle=(BYTE*)X_TOGGPOS;
+1524   3      #if 1
+1525   3            cpPowerToggle+=curr_device;
+1526   3      #endif
+1527   3            idx_key_local=(*cpPowerToggle);
+1528   3            k*=idx_key_local;
+1529   3      
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 26  
+
+1530   3            if((pCodeaddr+k)>=pCodeLast)  
+1531   3              i*=idxKey;  //ng
+1532   3            else              
+1533   3            {
+1534   4              i*=idx_key_local;
+1535   4      #if 1     //power_toggle 에 dummy data 일 경우 원래 position 의 data read
+1536   4              pCodeaddr+=i;
+1537   4      #if (USE_ADDRESS_32BIT == FALSE)
+1538   4              pulPtr=(ULONG *)pCodeaddr;
+1539   4              ramCode.Data=*pulPtr;
+1540   4      #else
+                      //4-byte 주소 체계로 인하여, 만약 address 가 4-byte 단위로 떨어지지 않으면 연산
+             - 에러가 발생하여 위 코드는 주석 처리하고
+                      //대신에 1-byte 단위로 처리함(James.KIM)
+                      ramCode.Data =  (pCodeaddr[3] << 24);
+                      ramCode.Data |= (pCodeaddr[2] << 16);
+                      ramCode.Data |= (pCodeaddr[1] << 8);
+                      ramCode.Data |=  pCodeaddr[0];
+              #endif
+1548   4              pCodeaddr-=i;
+1549   4      #if (USE_LITTLE_ENDIAN == FALSE)
+1550   4              Convert_cd(&(ramCode.Data));
+1551   4      #endif
+1552   4            //----------------------------------------------// >>> data dummy compare insert
+1553   4              k=(BYTE)(ramCode.Data&0x000000ff);
+1554   4      
+1555   4              cpX_keymap2=(BYTE*)X_DATADUMMY;
+1556   4              cpX_keymap2=(cpX_keymap2+curr_device);        //each device data dummy pointer
+1557   4      
+1558   4              if(k==*cpX_keymap2)
+1559   4              {
+1560   5                i*=idxKey;
+1561   5              }
+1562   4      #endif
+1563   4            }
+1564   3          }
+1565   2          else
+1566   2            i*=idxKey;
+1567   2        }
+1568   1        else
+1569   1          i*=idxKey;
+1570   1      
+1571   1      
+1572   1        pCodeaddr+=i;
+1573   1        if(pCodeaddr>=pCodeLast)    return FALSE;
+1574   1      
+1575   1      #if (USE_ADDRESS_32BIT == FALSE)
+1576   1        pulPtr=(ULONG *)pCodeaddr;
+1577   1        ramCode.Data=*pulPtr;
+1578   1      #else
+                //4-byte 주소 체계로 인하여, 만약 address 가 4-byte 단위로 떨어지지 않으면 연산 �
+             -�러가 발생하여 위 코드는 주석 처리하고
+                //대신에 1-byte 단위로 처리함(James.KIM)
+                ramCode.Data =  (pCodeaddr[3] << 24);
+                ramCode.Data |= (pCodeaddr[2] << 16);
+                ramCode.Data |= (pCodeaddr[1] << 8);
+                ramCode.Data |=  pCodeaddr[0];
+              #endif
+1586   1      
+1587   1      //----------------------------------------------//
+1588   1      // digital tv bs rotate data 07.07.17
+1589   1      //  if(curr_source==DEV_BS) BS_Key_Check();
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 27  
+
+1590   1      //----------------------------------------------//
+1591   1      #if (USE_LITTLE_ENDIAN == FALSE)
+1592   1        Convert_cd(&(ramCode.Data));
+1593   1      #endif
+1594   1      //----------------------------------------------// >>> data dummy compare insert
+1595   1        k=(BYTE)(ramCode.Data&0x000000ff);
+1596   1      
+1597   1        cpX_keymap2=(BYTE code*)X_DATADUMMY;
+1598   1        cpX_keymap2=(cpX_keymap2+curr_device);        //each device data dummy pointer
+1599   1      
+1600   1        if(k==*cpX_keymap2) return FALSE;             // <<<
+1601   1      //----------------------------------------------//
+1602   1      
+1603   1        if(pTemp)                                     // multi custom
+1604   1        {
+1605   2          ulIndex=ramCode.Data;
+1606   2          ulIndex>>=ramFormat.strMember.datasize.data1;
+1607   2          ulIndex&=(ULONG)pbMaskIndex[ramFormat.strMember.datasize.index1+ramFormat.strMember.customsize.index2-1]
+             -;
+1608   2      
+1609   2          ulIndex*=(ramFormat.strMember.customsize.custom+7)/8;
+1610   2          pTemp+=ulIndex;
+1611   2          
+1612   2      #if (USE_ADDRESS_32BIT == FALSE)
+1613   2          pulPtr=(ULONG *)pTemp;
+1614   2          ramCode.Custom=*pulPtr;
+1615   2      #else
+                  //4-byte 주소 체계로 인하여, 만약 address 가 4-byte 단위로 떨어지지 않으면 연산 �
+             -��러가 발생하여 위 코드는 주석 처리하고
+                  //대신에 1-byte 단위로 처리함(James.KIM)
+                  ramCode.Custom =  (pTemp[3] << 24);
+                  ramCode.Custom |= (pTemp[2] << 16);
+                  ramCode.Custom |= (pTemp[1] << 8);
+                  ramCode.Custom |=  pTemp[0];
+              #endif
+1623   2          
+1624   2      #if (USE_LITTLE_ENDIAN == FALSE)
+1625   2          Convert_cd(&(ramCode.Custom));
+1626   2      #endif
+1627   2        }
+1628   1          return TRUE;
+1629   1      }
+1630          
+1631          
+1632          void Convert_cd(ULONG* a)
+1633          {
+1634   1        ULONG t = 0;
+1635   1      
+1636   1        t |= (*a >> 24);
+1637   1        t |= (*a >> 8) & 0x0000ff00;
+1638   1        t |= (*a << 8) & 0x00ff0000;
+1639   1        t |= (*a << 24);
+1640   1      
+1641   1        *a = t;
+1642   1      }
+1643          
+1644          //----------------------------------------------
+1645          // setNo address find in setting modeC
+1646          //----------------------------------------------
+1647          BYTE const* GetCodeAddress_set(set_number_t bSetNo)
+1648          {
+1649   1        set_number_t  bDataInDB;
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 28  
+
+1650   1        byte* pCode_fixaddr;
+1651   1      
+1652   1        pCode_fixaddr = (byte code*) X_DEVICE[curr_device];
+1653   1        bDataInDB = LoadSetNumber(pCode_fixaddr);
+1654   1      
+1655   1        if(!bDataInDB) return  FALSE;
+1656   1      
+1657   1        while(bDataInDB != bSetNo)
+1658   1        {
+1659   2          pCode_fixaddr+=INC_PTR_SIZE;                            // next
+1660   2          bDataInDB     = *pCode_fixaddr;                 // next address jump
+1661   2          pCode_fixaddr += bDataInDB;
+1662   2      
+1663   2          bDataInDB = LoadSetNumber(pCode_fixaddr);
+1664   2      
+1665   2          if(!bDataInDB)
+1666   2          {
+1667   3            return pCode_fixaddr;                         // not found
+1668   3          }
+1669   2        }
+1670   1      
+1671   1        return pCode_fixaddr;
+1672   1      }
+1673          
+1674          //-----------------------------------------
+1675          // 3-digit setting
+1676          //-----------------------------------------
+1677          void Setting_Mode(void)
+1678          {
+1679   1        BYTE  i;
+1680   1        BYTE* p;
+1681   1      
+1682   1        //SetMode_StartTimeOut(SETUP_TIMEOUT_S);
+1683   1      
+1684   1        direction_inAuto=0xff;
+1685   1      
+1686   1        switch(setting_source)
+1687   1        {
+1688   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+1689   2          case  SRC_STB:
+1690   2            setting_no=set_no.set_member.set_no.stb_src;
+1691   2            setting_device=set_no.set_member.set_dev.stb_src;
+1692   2            StbNo_AutoSearch = setting_no;
+1693   2            break;
+1694   2      #endif
+1695   2          case  SRC_TV:
+1696   2            setting_no=set_no.set_member.set_no.tv_src;
+1697   2            setting_device=set_no.set_member.set_dev.tv_src;
+1698   2            break;
+1699   2        }
+1700   1      
+1701   1        refDev_inAuto=setting_device;
+1702   1        refNo_inAuto=setting_no;
+1703   1      
+1704   1        reg_key_max=0;
+1705   1        p=(BYTE*)reg_key_buf;
+1706   1      
+1707   1        for(i=0; i<4; i++) *(p+i)=0;
+1708   1      }
+1709          
+1710          //----------------------------------------
+1711          // Code_Read_Out
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 29  
+
+1712          //----------------------------------------
+1713          void Code_Read_Out(void)
+1714          {
+1715   1        BYTE  cnt;
+1716   1        set_number_t set_num;
+1717   1      
+1718   1        reg_key_buf[0]=0;
+1719   1        reg_key_buf[1]=0;
+1720   1        reg_key_buf[2]=0;
+1721   1        reg_key_buf[3]=0;
+1722   1      
+1723   1        set_num = set_no.set_member.set_no.tv_src;
+1724   1      
+1725   1      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+1726   1        if(setting_source == SRC_STB)
+1727   1        {
+1728   2          set_num = set_no.set_member.set_no.stb_src;
+1729   2        }
+1730   1      #endif
+1731   1      
+1732   1        reg_key_buf[0] = (set_num/100);
+1733   1        reg_key_buf[1] = ((set_num/10)%10);
+1734   1        reg_key_buf[2] = (set_num%10);
+1735   1      
+1736   1      #if (USE_2BYTE_SETTING_NO == FALSE)
+                if(set_no.set_member.set_dev.tv_src == DEV_TV1)
+                  reg_key_buf[0] += 3;
+              #endif
+1740   1      
+1741   1        device_led_off(CODEREADOUT_LED);
+1742   1        t0_wait(7);
+1743   1      
+1744   1        cnt=reg_key_buf[0];
+1745   1        if(!cnt)
+1746   1          device_Led_blink(CODEREADOUT_LED, 10, 5, 5);
+1747   1        else
+1748   1          device_Led_blink(CODEREADOUT_LED, cnt, 5, 5);
+1749   1        device_led_off(CODEREADOUT_LED);
+1750   1        t0_wait(23);
+1751   1      
+1752   1        cnt=reg_key_buf[1];
+1753   1        if(!cnt)
+1754   1          device_Led_blink(CODEREADOUT_LED, 10, 5, 5);
+1755   1        else
+1756   1          device_Led_blink(CODEREADOUT_LED, cnt, 5, 5);
+1757   1        device_led_off(CODEREADOUT_LED);
+1758   1        t0_wait(23);
+1759   1      
+1760   1        cnt=reg_key_buf[2];
+1761   1        if(!cnt)
+1762   1          device_Led_blink(CODEREADOUT_LED, 10, 5, 5);
+1763   1        else
+1764   1          device_Led_blink(CODEREADOUT_LED, cnt, 5, 5);
+1765   1        device_led_off(CODEREADOUT_LED);
+1766   1      }
+1767          
+1768          //----------------------------------------
+1769          // 3digit -> 1byte hex change
+1770          //----------------------------------------
+1771          BYTE Get1CodeFrom3Buf(BYTE* p)
+1772          {
+1773   1        set_number_t  i;
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 30  
+
+1774   1      
+1775   1      #if (USE_2BYTE_SETTING_NO == TRUE)
+1776   1        i=( (*p *100) + (p[1]*10) + (p[2]) );
+1777   1      #else
+                WORD  k;
+                k=( (*p *100) + (p[1]*10) + (p[2]) );
+              
+                if(k>256)
+                  return FALSE;
+              
+                i=(BYTE)k;
+              #endif
+1786   1      
+1787   1      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+1788   1        if((setting_device == DEV_STB)&&(i >= IR_CUSTOM_NUM_MIN)&&(i <= IR_CUSTOM_NUM_MAX))
+1789   1        {
+1790   2          setting_no=i;                               //현재 입력된 3-digit load to setting_no.
+1791   2      
+1792   2          refNo_inAuto=i;
+1793   2          refDev_inAuto=setting_device;
+1794   2      
+1795   2          StbNo_AutoSearch = setting_no;
+1796   2      
+1797   2          return TRUE;
+1798   2        }
+1799   1      #endif
+1800   1      
+1801   1        p=(int8u*)GetCodeAddress_set(i);     //pCodeaddr=set no가 위치한 address in each device       // (idx
+             -Device, code)
+1802   1      
+1803   1        if(!LoadSetNumber(p))
+1804   1          return FALSE;                             //db 0 -> end point
+1805   1      
+1806   1        setting_no=i;                               //현재 입력된 3-digit load to setting_no.
+1807   1      
+1808   1        refNo_inAuto=i;
+1809   1        refDev_inAuto=setting_device;
+1810   1      
+1811   1        return TRUE;
+1812   1      }
+1813          
+1814          //-------------------------------------------
+1815          // auto 1 & 2 mode에서 next setNo search (u/r only)
+1816          //-------------------------------------------
+1817          void next_searchNo_find_inAutoSearch(void)
+1818          {
+1819   1        cpX_keymap2+=INC_PTR_SIZE;                              // next
+1820   1        setting_no=*cpX_keymap2;                    // next address jump
+1821   1        chksum=setting_no;
+1822   1        cpX_keymap2+=setting_no;
+1823   1      
+1824   1        setting_no=LoadSetNumber(cpX_keymap2);
+1825   1      
+1826   1        if(!setting_no)                             //meet db 0 (last)
+1827   1        {
+1828   2          cpX_keymap2=(byte code*) X_DEVICE[curr_device]; //1'st address.
+1829   2          setting_no=LoadSetNumber(cpX_keymap2);
+1830   2        }
+1831   1      }
+1832          
+1833          void prev_searchNo_find_inAutoSearch(void)
+1834          {
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 31  
+
+1835   1        set_number_t  CodeNo=setting_no;
+1836   1        set_number_t  data1;
+1837   1        int8u temp;
+1838   1      
+1839   1        cpX_keymap2=(byte code*) X_DEVICE[curr_device]; //1'st address.
+1840   1      
+1841   1        if(LoadSetNumber(cpX_keymap2) == setting_no)
+1842   1        {
+1843   2          cpX_keymap2=(byte code*) X_DEVICE[curr_device]; //1'st address.
+1844   2          while(TRUE)   //while(data1!=i)
+1845   2          {
+1846   3            cpX_keymap2+=INC_PTR_SIZE;                          // next
+1847   3            data1=*cpX_keymap2;                     // next address jump
+1848   3            temp=data1;
+1849   3            cpX_keymap2+=data1;
+1850   3      
+1851   3            data1=LoadSetNumber(cpX_keymap2);
+1852   3      
+1853   3            if(!data1)                              //can't found.
+1854   3              break;
+1855   3          }
+1856   2      #if (USE_2BYTE_SETTING_NO == TRUE)
+1857   2          //setting_no=*(cpX_keymap2-temp-2);         //last setNo in each devcie.
+1858   2          //setting_no|=*(cpX_keymap2-temp-1)<<8;         //last setNo in each devcie.
+1859   2          setting_no=*(cpX_keymap2-temp-2)<<8;          //last setNo in each devcie.
+1860   2          setting_no|=*(cpX_keymap2-temp-1);          //last setNo in each devcie.
+1861   2      #else
+                  setting_no=*(cpX_keymap2-temp-1);         //last setNo in each devcie.
+              #endif
+1864   2          return;
+1865   2        }//end of that find last setNo.
+1866   1        do
+1867   1        {
+1868   2          next_searchNo_find_inAutoSearch();
+1869   2        }while(CodeNo != setting_no);
+1870   1      
+1871   1      #if (USE_2BYTE_SETTING_NO == TRUE)
+1872   1        //setting_no=*(cpX_keymap2-chksum-2);         //last setNo in each devcie.
+1873   1        //setting_no|=*(cpX_keymap2-chksum-1)<<8;         //last setNo in each devcie.
+1874   1        setting_no=*(cpX_keymap2-chksum-2)<<8;          //last setNo in each devcie.
+1875   1        setting_no|=*(cpX_keymap2-chksum-1);          //last setNo in each devcie.
+1876   1      #else
+                setting_no=*(cpX_keymap2-chksum-1);
+              #endif
+1879   1      }
+1880          
+1881          void device_led_off(BYTE i)
+1882          {
+1883   1        //all_led_off;  
+1884   1        //led_force = 0xff;
+1885   1      
+1886   1        if(led_force!=0xff)
+1887   1          i=led_force;
+1888   1      
+1889   1        switch(i)
+1890   1        {
+1891   2          case  LED_1:
+1892   2            led1_off;
+1893   2            break;
+1894   2      
+1895   2          case  LED_2:
+1896   2            led2_off;
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 32  
+
+1897   2            break;
+1898   2      
+1899   2          case  LED_3:
+1900   2            led3_off;
+1901   2            break;
+1902   2      
+1903   2          default:
+1904   2            all_led_off;
+1905   2            break;
+1906   2        }
+1907   1        
+1908   1      }
+1909          
+1910          void device_led_on(BYTE i)
+1911          {
+1912   1        //all_led_off;
+1913   1      
+1914   1        if(led_force!=0xff)
+1915   1          i=led_force;
+1916   1      
+1917   1        switch(i)
+1918   1        {
+1919   2          case  LED_1:
+1920   2            led1_on;
+1921   2            break;
+1922   2      
+1923   2          case  LED_2:
+1924   2            led2_on;
+1925   2            break;
+1926   2      
+1927   2          case  LED_3:
+1928   2            led3_on;
+1929   2            break;
+1930   2      
+1931   2          default:
+1932   2            all_led_off;
+1933   2            break;
+1934   2        }
+1935   1      }
+1936          
+1937          //----------------------------------------
+1938          // setting device led blink.
+1939          //----------------------------------------
+1940          void device_Led_blink(int8u type, int8u repeat, int16u on_ms, int16u off_ms)
+1941          {
+1942   1        BYTE  k;
+1943   1      
+1944   1        for(k=repeat; k>0 ; k--)
+1945   1        {
+1946   2          device_led_off(type);
+1947   2          t0_wait(off_ms);
+1948   2          device_led_on(type);
+1949   2          t0_wait(on_ms);
+1950   2        }
+1951   1      }
+1952          
+1953          #if (USE_LOW_BATT_LED == TRUE)
+1954          BOOL device_Led_blink_key_chk(int8u type, int8u repeat, int16u on_ms, int16u off_ms)
+1955          {
+1956   1        BYTE  k;
+1957   1      
+1958   1        for(k=repeat; k>0 ; k--)
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 33  
+
+1959   1        {
+1960   2          device_led_off(type);
+1961   2          if(t0_wait_keyin_chk(off_ms))
+1962   2            return TRUE;
+1963   2          device_led_on(type);
+1964   2          if(t0_wait_keyin_chk(on_ms))
+1965   2            return TRUE;
+1966   2        }
+1967   1        return FALSE;
+1968   1      } 
+1969          #endif
+1970          
+1971          void device_Led_InSetUp(int8u result, int8u type)
+1972          {
+1973   1        switch(result)
+1974   1        {
+1975   2          case  SET_ENTRY:
+1976   2            device_Led_blink(type, 1, 0, 8); 
+1977   2            break;
+1978   2          case  SET_OK:
+1979   2            device_Led_blink(type, 2, 4, 4);
+1980   2            break;
+1981   2          case  SET_NG:
+1982   2            device_Led_blink(type, 1, 0, 16);
+1983   2            break;
+1984   2          case  SET_LEARN_ENTRY:
+1985   2            device_Led_blink(type, 1, 0, 4);
+1986   2            break;
+1987   2          case  SET_LEARN_OK:
+1988   2            device_Led_blink(type, 2, 4, 4);
+1989   2            break;
+1990   2          case  SET_LEARN_NG:
+1991   2            device_Led_blink(type, 1, 0, 31);
+1992   2            break;
+1993   2        }
+1994   1      }
+1995          
+1996          #if (USE_BACKLIGHT == TRUE)
+              //backlighting -> pwm.
+              void BackLight_Dim_On(void)
+              {
+              
+              }
+              
+              void BackLight_Dim_Off(void)
+              {
+              }
+              #endif
+2007          
+2008          
+2009          void Check_Key_InSetmode(int8u* key1, int8u* key2)
+2010          {
+2011   1        twokey_result=0xff;
+2012   1        //backup_key=0xff;
+2013   1      
+2014   1        switch(*key1)
+2015   1        {
+2016   2          case KEY_OK:
+2017   2            switch(*key2)
+2018   2            {
+2019   3              case  KEY_TVPOWER:
+2020   3                twokey_result = COMBO_KEYS_UR_SETUP;
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 34  
+
+2021   3                break;
+2022   3      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2023   3              case  KEY_STBPOWER:
+2024   3                twokey_result = COMBO_KEYS_STB_SETUP;
+2025   3                break;
+2026   3      #endif
+2027   3            }
+2028   2            break;
+2029   2          case KEY_RED:
+2030   2            switch(*key2)
+2031   2            {
+2032   3              case  KEY_STBPOWER:
+2033   3                twokey_result = COMBO_KEYS_FACTORY_DEFAULT;
+2034   3                break;
+2035   3            }
+2036   2            break;
+2037   2        }
+2038   1      
+2039   1        if(twokey_result!=0xff)
+2040   1        {
+2041   2          backup_key = *key2;
+2042   2          return;
+2043   2        }
+2044   1      
+2045   1        switch(*key2)
+2046   1        {
+2047   2          case KEY_OK:
+2048   2            switch(*key1)
+2049   2            {
+2050   3              case  KEY_TVPOWER:
+2051   3                twokey_result = COMBO_KEYS_UR_SETUP;
+2052   3                break;
+2053   3      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2054   3              case  KEY_STBPOWER:
+2055   3                twokey_result = COMBO_KEYS_STB_SETUP;
+2056   3                break;
+2057   3      #endif
+2058   3            }
+2059   2            break;
+2060   2          case KEY_RED:
+2061   2            switch(*key1)
+2062   2            {
+2063   3              case  KEY_STBPOWER:
+2064   3                twokey_result = COMBO_KEYS_FACTORY_DEFAULT;
+2065   3                break;
+2066   3            }
+2067   2            break;
+2068   2        }
+2069   1      
+2070   1        if(twokey_result!=0xff)
+2071   1        {
+2072   2          backup_key = *key1;
+2073   2          return;
+2074   2        }
+2075   1      }
+2076          
+2077          //-------------------------------------------
+2078          // direction  1:up
+2079          //            0:down  search.
+2080          //-------------------------------------------
+2081          void auto_search_1(int8u direction)
+2082          {
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 35  
+
+2083   1        direction_G=direction;
+2084   1      
+2085   1        reg_key_max=0;
+2086   1        reg_key_buf[0]=0;
+2087   1        reg_key_buf[1]=0;
+2088   1        reg_key_buf[2]=0;
+2089   1        reg_key_buf[3]=0;
+2090   1      
+2091   1        Timer0_65ms16_2_Update(SETUP_TIMEOUT_S);
+2092   1      
+2093   1        if(setting_device==0xff)
+2094   1        {
+2095   2          device_Led_InSetUp(SET_NG, SETTING_MODE_LED);
+2096   2          return;
+2097   2        }
+2098   1      
+2099   1        curr_device=setting_device;
+2100   1      
+2101   1        //1'st search -> 설정 진입 후 처음으로 search가 진행되는 경우.//search to current db no
+2102   1        if(!setting_no)
+2103   1        {
+2104   2          cpX_keymap2=(byte code*) X_DEVICE[curr_device];       //1'st address.
+2105   2          setting_no=LoadSetNumber(cpX_keymap2);
+2106   2          if(direction_G)                                           //up search (next)
+2107   2            prev_searchNo_find_inAutoSearch();
+2108   2          direction_inAuto=0xff;
+2109   2          refDev_inAuto=setting_device;
+2110   2          refNo_inAuto=setting_no;
+2111   2          cpX_keymap2=(int8u*)GetCodeAddress_set(refNo_inAuto);   //current set no pointer
+2112   2        }
+2113   1        else
+2114   1        {
+2115   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2116   2          if(curr_device==DEV_STB)
+2117   2          {
+2118   3            cpX_keymap2=(int8u*)GetCodeAddress_set(1);
+2119   3          }
+2120   2          else
+2121   2      #endif
+2122   2          cpX_keymap2=(int8u*)GetCodeAddress_set(setting_no);     //설정중인 set no pointer
+2123   2        }
+2124   1        backup_settingNo=setting_no;
+2125   1        prev_direction=direction_inAuto;
+2126   1      
+2127   1        //설정진입 후 3-digit입력이나 search가 이루어진 후 진행되는 경우.
+2128   1        if(direction_G)                         //up search (next)
+2129   1        {
+2130   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2131   2          if(curr_device==DEV_STB)
+2132   2          {
+2133   3            if(StbNo_AutoSearch < IR_CUSTOM_NUM_MAX)
+2134   3              StbNo_AutoSearch++;
+2135   3            else
+2136   3              StbNo_AutoSearch = IR_CUSTOM_NUM_MIN;
+2137   3            setting_no = StbNo_AutoSearch;
+2138   3          }
+2139   2          else
+2140   2      #endif
+2141   2            next_searchNo_find_inAutoSearch();
+2142   2          direction_inAuto=1;
+2143   2        }
+2144   1        else                              //down search (prev)
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 36  
+
+2145   1        {
+2146   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2147   2          if(curr_device==DEV_STB)
+2148   2          {
+2149   3            if(StbNo_AutoSearch > IR_CUSTOM_NUM_MIN)
+2150   3              StbNo_AutoSearch--;
+2151   3            else
+2152   3              StbNo_AutoSearch = IR_CUSTOM_NUM_MAX;
+2153   3            setting_no = StbNo_AutoSearch;
+2154   3          }
+2155   2          else
+2156   2      #endif
+2157   2            prev_searchNo_find_inAutoSearch();
+2158   2          direction_inAuto=0;
+2159   2        }
+2160   1        backup_key=0xff;
+2161   1      
+2162   1        switch(curr_device)
+2163   1        {
+2164   2          case  DEV_TV:
+2165   2          case  DEV_TV1:
+2166   2            //key_buf[0]=KEY_TVPOWER;
+2167   2            IrKeyBuf=KEY_TVPOWER;
+2168   2            power_toggle++;
+2169   2            break;
+2170   2      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2171   2          case  DEV_STB:
+2172   2            //key_buf[0]=KEY_STBPOWER;
+2173   2            IrKeyBuf=KEY_STBPOWER;
+2174   2            break;
+2175   2      #endif
+2176   2          default:
+2177   2            break;
+2178   2        }
+2179   1      
+2180   1        key_cnt=1;
+2181   1      
+2182   1        if((Panasonic_TV_Check(curr_device, setting_no))&&(IrKeyBuf==KEY_TVPOWER))
+2183   1          irout_n(5);
+2184   1        else
+2185   1        {
+2186   2      #if (USE_BATCH_SS_LG == TRUE)
+2187   2          if(!batch_SS_LG_Common(curr_device, setting_no, IrKeyBuf))
+2188   2      #endif
+2189   2            irout_n(3);
+2190   2        }
+2191   1      
+2192   1        backup_key=0xff;
+2193   1        setting_ok=TRUE;
+2194   1      
+2195   1        if(prev_direction!=0xff)
+2196   1        {
+2197   2          if(direction_inAuto != prev_direction)    //different search direction between previous search direction
+2198   2          {
+2199   3            refNo_inAuto=backup_settingNo;      //현재 출력한 3-digit이전의 설정번호 ref로 저장.
+2200   3            refDev_inAuto=setting_device;
+2201   3          }
+2202   2        }
+2203   1      
+2204   1      #if (USE_SETUP_STB_IR_CUSTOM == TRUE)
+2205   1        if(curr_device==DEV_STB)
+2206   1        {
+C51 COMPILER V9.60.0.0   COMMON                                                            12/02/2021 14:01:34 PAGE 37  
+
+2207   2          device_Led_blink(SETTING_MODE_LED, 1, 0, 5);
+2208   2        }
+2209   1        else
+2210   1      #endif
+2211   1        {
+2212   2          if( (refNo_inAuto==setting_no) && (refDev_inAuto==setting_device) )
+2213   2            device_Led_blink(SETTING_MODE_LED, 10, 2, 2);
+2214   2          else
+2215   2            device_Led_blink(SETTING_MODE_LED, 1, 0, 5);
+2216   2        }
+2217   1      
+2218   1        //t0_wait_keyoff(1);          //300ms중에 key in이 된 경우 바로 return.
+2219   1      
+2220   1      //  device_led_on(curr_source);
+2221   1      //  wait_getkey_simple();
+2222   1      }
+2223          
+2224          
+2225          
+2226          #endif  //__COMMON_C__
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   8257    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----     123
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

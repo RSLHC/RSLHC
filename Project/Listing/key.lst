@@ -1,0 +1,146 @@
+C51 COMPILER V9.53.0.0   KEY                                                               12/08/2015 15:17:05 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE KEY
+OBJECT MODULE PLACED IN .\Objects\key.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\key.c OPTIMIZE(8,SPEED) BROWSE INCDIR(.\inc) DEBUG OBJECTEXTEND PRIN
+                    -T(.\Listings\key.lst) TABS(2) OBJECT(.\Objects\key.obj)
+
+line level    source
+
+   1          /**
+   2          ********************************************************************************
+   3          * @file      key.c
+   4          * @author    zhouzhongliang 
+   5          * @version   V1.0.0
+   6          * @date      10/30/2015
+   7          * @breif     按键扫描
+   8          ********************************************************************************
+   9          * History:
+  10          * 10/30/2015 V1.0.0
+  11          ********************************************************************************
+  12          * THE PRESENT SOFTWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
+  13          * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
+  14          * AS A RESULT, SLMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
+  15          * INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
+  16          * CONTENT OF SUCH SOFTWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
+  17          * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
+  18          *
+  19          * THIS SOURCE CODE IS PROTECTED BY A LICENSE.
+  20          * FOR MORE INFORMATION PLEASE CAREFULLY READ THE LICENSE AGREEMENT FILE LOCATED
+  21          * IN THE ROOT DIRECTORY OF THIS FIRMWARE PACKAGE.
+  22          * <h2><center>&copy; COPYRIGHT 2015 Silan Microelectronics </center></h2>
+  23          ********************************************************************************
+  24          */
+  25          #include "DataType.h"
+  26          #include "SC51F33XX.h"
+  27          
+  28          // 高8位表示输出，低8位表示输入。如P02=0，读取P1口为FE，则为KEY0.P03=0，读取P1=FE，则KEY1.
+  29          code U16 key_table[]=
+  30          {
+  31            //P02   P03   P04    P05    P06     P07    P20    P21
+  32            0xFEFE,0xFDFE,0xFBFE,0xF7FE,0xEFFE,0xDFFE,0xBFFE,0x7FFE, //P10
+  33            0xFEFD,0xFDFD,0xFBFD,0xF7FD,0xEFFD,0xDFFD,0xBFFD,0x7FFD, //P11
+  34            0xFEFB,0xFDFB,0xFBFB,0xF7FB,0xEFFB,0xDFFB,0xBFFB,0x7FFB, //P12
+  35            0xFEF7,0xFDF7,0xFBF7,0xF7F7,0xEFF7,0xDFF7,0xBFF7,0x7FF7, //P13
+  36            0xFEEF,0xFDEF,0xFBEF,0xF7EF,0xEFEF,0xDFEF,0xBFEF,0x7FEF, //P14
+  37            0xFEDF,0xFDDF,0xFBDF,0xF7DF,0xEFDF,0xDFDF,0xBFDF,0x7FDF, //P15
+  38            0xFEBF,0xFDBF,0xFBBF,0xF7BF,0xEFBF,0xDFBF,0xBFBF,0x7FBF, //P16
+  39            0xFE7F,0xFD7F,0xFB7F,0xF77F,0xEF7F,0xDF7F,0xBF7F,0x7F7F, //P17
+  40          };
+  41          
+  42          /**
+  43           * Function:将i输出给P02~P21.
+  44          */
+  45          void key_out(U8 i)
+  46          {
+  47   1        ACC = i;
+  48   1        P02 = ACC0;
+  49   1        P03 = ACC1;
+  50   1        P04 = ACC2;
+  51   1        P05 = ACC3;
+  52   1        P06 = ACC4;
+  53   1        P07 = ACC5;
+  54   1        //P20 = ACC6;
+C51 COMPILER V9.53.0.0   KEY                                                               12/08/2015 15:17:05 PAGE 2   
+
+  55   1        //P21 = ACC7;
+  56   1      }
+  57          
+  58          /**
+  59           * Function: read P1
+  60           * @return P1 port value
+  61          */
+  62          U8 key_in()
+  63          {
+  64   1        return P1 | 0x80;
+  65   1      }
+  66          
+  67          /**
+  68           * Function: P0,P1 key out config
+  69          */
+  70          void key_p0out_p1in()
+  71          {
+  72   1        P0MDL = 0xF0;
+  73   1        P0MDH = 0xFF;
+  74   1        
+  75   1        P1MDL = 0x55;
+  76   1        P1MDH = 0x95;
+  77   1      }
+  78          
+  79          /**
+  80           * Function: 按键扫描
+  81           * @return 键码
+  82          */
+  83          U8 keyscan()
+  84          {
+  85   1        U8 i;
+  86   1        U8 keyret = 0xFF;
+  87   1        U16 keycode = 0xFFFF;
+  88   1        //
+  89   1        key_p0out_p1in();
+  90   1        key_out(0x00); //全部输出0
+  91   1        if(key_in() == 0xFF) //没有按键按下，返回0xFF;
+  92   1          goto NOKEYDOWN;
+  93   1        
+  94   1        //如果不为FF，则肯定有按键按下。  
+  95   1        for(i = 0; i < 8; i++) //按列输出
+  96   1        {
+  97   2          keycode = key_table[i];
+  98   2          keycode = keycode&0xFF00;
+  99   2          key_out((keycode>>8)&0xFF);
+ 100   2          if(key_in() != 0xff)
+ 101   2          {
+ 102   3            keycode |= key_in();
+ 103   3            break;
+ 104   3          }
+ 105   2        }
+ 106   1        
+ 107   1        for(i = 0; i < sizeof(key_table)/sizeof(U16); i++)
+ 108   1        {
+ 109   2          if(keycode == key_table[i])
+ 110   2          {
+ 111   3            keyret = i;
+ 112   3            break;
+ 113   3          }
+ 114   2        }
+ 115   1          
+ 116   1      NOKEYDOWN:
+C51 COMPILER V9.53.0.0   KEY                                                               12/08/2015 15:17:05 PAGE 3   
+
+ 117   1        return keyret;
+ 118   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    144    ----
+   CONSTANT SIZE    =    128    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,38 @@
+{
+    "configurations": [
+        {
+            "name": "SC51F33xx",
+            "includePath": [
+                "C:\\Keil_v5\\C51\\INC",
+                "c:\\Users\\LHC\\Desktop\\Work\\@@ KT Silan 이원화_RB95D\\KT_RB95D_SC51F3364RE1G_Workspace_gittest\\Source",
+                "c:\\Users\\LHC\\Desktop\\Work\\@@ KT Silan 이원화_RB95D\\KT_RB95D_SC51F3364RE1G_Workspace_gittest\\Source\\DB"
+            ],
+            "defines": [
+                "__C51__",
+                "__VSCODE_C51__",
+                "reentrant=",
+                "compact=",
+                "small=",
+                "large=",
+                "data=",
+                "idata=",
+                "pdata=",
+                "bdata=",
+                "xdata=",
+                "code=",
+                "bit=char",
+                "sbit=char",
+                "sfr=char",
+                "sfr16=int",
+                "sfr32=int",
+                "interrupt=",
+                "using=",
+                "_at_=",
+                "_priority_=",
+                "_task_="
+            ],
+            "intelliSenseMode": "${default}"
+        }
+    ],
+    "version": 4
+}

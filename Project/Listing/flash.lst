@@ -1,0 +1,216 @@
+C51 COMPILER V9.60.0.0   FLASH                                                             12/02/2021 14:01:34 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE FLASH
+OBJECT MODULE PLACED IN .\Output\flash.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Source\flash.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Li
+                    -sting\flash.lst) TABS(2) OBJECT(.\Output\flash.obj)
+
+line level    source
+
+   1          
+   2          #ifndef __FLASH_C__
+   3          #define __FLASH_C__
+   4          
+   5          /**************************************************************************************************
+   6           *                                            INCLUDES
+   7           **************************************************************************************************/
+   8          #include  "SC51F33XX.h"
+   9          #include  "type_def.h"
+  10          #include    "main.h"
+  11          #include  "common.h"
+  12          #include  "rom.h"
+  13          #include  "ram.h"
+  14          #include  "define.h"
+  15          #include  "function_key.h"
+  16          #include  "data.h"
+  17          #include  "hal.h"
+  18          #include  "flash.h"
+  19          
+  20          #if (USE_IR_LEARN == TRUE)
+              #include  "learn.h"
+              #endif
+  23          
+  24          #define coderom ((volatile unsigned char code *)0x0000)
+  25          //unsigned char code coderom[1024] _at_ 0xFC00;
+  26          
+  27          /**************************************************************************************************
+  28           *                                        FUNCTIONS - API
+  29           **************************************************************************************************/
+  30          //=============================================================
+  31          // Function：Flash page erase
+  32          // Input：
+  33          //       addr: Page address
+  34          // Note：1024 Bytes is 1 Page
+  35          //       FSHTIM : Use Flash Erase or Write
+  36          //          f=MCLK/(FSHTIM+1)=1MHz
+  37          void flash_page_erase(int32u addr)
+  38          {
+  39   1        int16u ii;
+  40   1        int16u addr0 = addr & ~0x3ff;   //1024byte
+  41   1      
+  42   1        eeFAIL=0;
+  43   1          eeFAILAddress=0;
+  44   1      
+  45   1        //address precheck
+  46   1        if((addr0<EEPROM_START_ADDR)||(addr0>EEPROM_END_ADDR))  //precheck avoiding against malfunction like jump 
+             -error 
+  47   1        {
+  48   2          eeFAIL=0xff;
+  49   2          eeFAILAddress=addr;
+  50   2          return;
+  51   2        }
+  52   1      
+  53   1        //blank check 
+C51 COMPILER V9.60.0.0   FLASH                                                             12/02/2021 14:01:34 PAGE 2   
+
+  54   1        for(ii = 0; ii < EEPROM_PBUFF_SIZE; ii++) 
+  55   1        {
+  56   2              if(coderom[addr0+ii] != 0x00) {
+  57   3            break;
+  58   3          }
+  59   2        }
+  60   1        if(ii==EEPROM_PBUFF_SIZE) //skip if blank 
+  61   1        {
+  62   2          return; 
+  63   2        }
+  64   1      
+  65   1                // MCLK = 16MHz
+  66   1        FSHTIM = 0x0F;  // FSHTIM = 15 => MCLK/(FSHTIM+1) = 16MHz/(15+1) = 1MHz 
+  67   1        FSHADRH = (addr>>8)&0xFF;
+  68   1        FSHADRL = addr&0xFF;
+  69   1        FSHCON |= 0x80;
+  70   1        FSHKEY = 0xA5;
+  71   1        FSHKEY = 0xF1;
+  72   1        FSHCON &= ~0x01;
+  73   1        FSHCON |= 0x20; //start flash page erasing
+  74   1        //return (FSHCON&0x01); 
+  75   1        return; 
+  76   1      }
+  77          
+  78          
+  79          //=============================================================
+  80          // Function：Flash byte write
+  81          // Input：
+  82          //       addr:Address， uc_data:Data
+  83          // Note: FSHTIM : Use Flash Erase or Write
+  84          //     f=MCLK/(FSHTIM+1)=1MHz
+  85          
+  86          void flash_page_write(int16u addr, int8u *uc_data)
+  87          {
+  88   1        int16u ii;
+  89   1          int16u addr0 = addr & ~0x3ff; //1024byte  
+  90   1      
+  91   1        eeFAIL=0x00;
+  92   1        eeFAILAddress=0x00;
+  93   1      
+  94   1        //address precheck
+  95   1        if((addr<EEPROM_START_ADDR)||(addr>EEPROM_END_ADDR))  //precheck avoiding against malfunction like jump er
+             -ror 
+  96   1        {
+  97   2          eeFAIL=0xff;
+  98   2          eeFAILAddress=addr;
+  99   2          return;
+ 100   2        }
+ 101   1      
+ 102   1                // MCLK = 16MHz
+ 103   1        FSHTIM = 0x0F;  // FSHTIM = 15 => MCLK/(FSHTIM+1) = 16MHz/(15+1) = 1MHz 
+ 104   1        
+ 105   1        for(ii = 0; ii < EEPROM_PBUFF_SIZE; ii ++) {
+ 106   2          FSHADRH = (addr>>8)&0xFF;
+ 107   2          FSHADRL = addr&0xFF;
+ 108   2          FSHDAT = uc_data[ii];
+ 109   2          FSHCON = 0x80;
+ 110   2          FSHKEY = 0xA5;
+ 111   2          FSHKEY = 0xF1;
+ 112   2          FSHCON &= ~0x01;    
+ 113   2          FSHCON |= 0x10; // start flash write
+ 114   2          addr ++;
+C51 COMPILER V9.60.0.0   FLASH                                                             12/02/2021 14:01:34 PAGE 3   
+
+ 115   2        }
+ 116   1        
+ 117   1        //verify
+ 118   1          for(ii = 0; ii < EEPROM_PBUFF_SIZE; ii ++) {
+ 119   2              if(coderom[addr0+ii] != uc_data[ii]) {
+ 120   3            _nop_();
+ 121   3            eeFAIL=0x02;
+ 122   3            eeFAILAddress=addr0+ii;
+ 123   3            break;
+ 124   3              }
+ 125   2          }
+ 126   1      
+ 127   1        return;
+ 128   1      }
+ 129          
+ 130          void ReadFromFlash(WORD bAddr, byte *pByte, int size)
+ 131          {
+ 132   1        byte  i;
+ 133   1      
+ 134   1        for(i = 0; i < size; i++) 
+ 135   1        {
+ 136   2          *pByte = coderom[bAddr+(unsigned int)i];
+ 137   2          pByte++;
+ 138   2        }
+ 139   1      }
+ 140          
+ 141          
+ 142          void WriteToFlash(int16u bAddr, int8u *pByte)
+ 143          {
+ 144   1        // Note: Usually Byte write after page erage
+ 145   1        flash_page_erase(bAddr);
+ 146   1      
+ 147   1        if(eeFAIL)
+ 148   1        { 
+ 149   2          _nop_(); 
+ 150   2          return; 
+ 151   2        }
+ 152   1      
+ 153   1        flash_page_write(bAddr, pByte);
+ 154   1      
+ 155   1      }
+ 156          
+ 157          //----------------------------------------------------
+ 158          //flash_rw=0 : read
+ 159          //        =1 : write
+ 160          void Information_RW(int8u rw)
+ 161          {
+ 162   1        pflashCode = STARTADDR_INFO;
+ 163   1      
+ 164   1        if(rw)
+ 165   1        {
+ 166   2          WriteToFlash(STARTADDR_INFO, set_no.set_reg);
+ 167   2        }
+ 168   1        else
+ 169   1        {
+ 170   2          ReadFromFlash(STARTADDR_INFO, set_no.set_reg, BACKUP_SIZE);
+ 171   2        }
+ 172   1      }
+ 173          
+ 174          
+ 175          void Save_Information_All(void)
+ 176          {
+C51 COMPILER V9.60.0.0   FLASH                                                             12/02/2021 14:01:34 PAGE 4   
+
+ 177   1        chksum_cal();
+ 178   1        set_no.set_member.Chksum.sum=chksum;
+ 179   1        set_no.set_member.Chksum.com=~chksum;
+ 180   1        Information_RW(WRITE);
+ 181   1      }
+ 182          
+ 183          #endif  //__FLASH_C__
+ 184          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    441    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      21
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
